@@ -1,39 +1,115 @@
-import React, { useState } from 'react'
-import Header from './components/layout/Header.jsx'
-import Footer from './components/layout/Footer.jsx'
-import Home from './pages/Home.jsx'
-import Products from './pages/Products.jsx'
-import Categories from './pages/Categories.jsx'
-import SupplierJoin from './pages/SupplierJoin.jsx'
-import CustomerJoin from './pages/CustomerJoin.jsx'
-import SupplierDashboard from './pages/SupplierDashboard.jsx'
-import CustomerDashboard from './pages/CustomerDashboard.jsx'
-import AdminDashboard from './pages/AdminDashboard.jsx'
-import Contact from './pages/Contact.jsx'
+import React, { useEffect, useState } from 'react'
+import { createClient } from '@supabase/supabase-js'
+import { ShoppingCart, Menu } from 'lucide-react'
 
-const pages = {
-  home: Home,
-  products: Products,
-  categories: Categories,
-  supplier: SupplierJoin,
-  customer: CustomerJoin,
-  supplierDashboard: SupplierDashboard,
-  customerDashboard: CustomerDashboard,
-  admin: AdminDashboard,
-  contact: Contact
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabase = supabaseUrl && supabaseAnon ? createClient(supabaseUrl, supabaseAnon) : null
+const whatsappNumber = import.meta.env.VITE_WHATSAPP_NUMBER || '201000000000'
+const wa = (msg='مرحبًا، أريد الاستفسار عن منصة Tager لتجارة الجملة للمواد الغذائية في مصر.') => `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`
+
+const demoCategories = [
+  {id:'c1',name_ar:'المواد الغذائية الجافة',description:'مكرونة، أرز، بقوليات، دقيق، سكر ومنتجات أساسية.',icon:'🌾'},
+  {id:'c2',name_ar:'الزيوت والسمن',description:'زيوت طعام، سمن نباتي وحيواني وعبوات جملة.',icon:'🛢️'},
+  {id:'c3',name_ar:'الألبان ومنتجاتها',description:'أجبان، لبن، زبادي، قشطة ومنتجات مبردة.',icon:'🧀'},
+  {id:'c4',name_ar:'المجمدات',description:'خضروات مجمدة، لحوم، دواجن، أسماك ومنتجات مجمدة.',icon:'❄️'},
+  {id:'c5',name_ar:'العصائر والمشروبات',description:'عصائر، مياه، مشروبات غازية ومشروبات ساخنة.',icon:'🥤'},
+  {id:'c6',name_ar:'المعلبات',description:'تونة، فول، صلصة وخضروات معلبة.',icon:'🥫'},
+  {id:'c7',name_ar:'البهارات والتوابل',description:'توابل وبهارات وخلطات للمطاعم.',icon:'🌶️'},
+  {id:'c8',name_ar:'حلويات وسناكس',description:'بسكويت، شيبسي، شوكولاتة وحلويات مغلفة.',icon:'🍪'}
+]
+const demoProducts = [
+  {id:'p1',product_name_ar:'زيت طعام 1 لتر - كرتونة 12 عبوة',supplier_name:'شركة النيل للزيوت',category_name:'الزيوت والسمن',governorate:'القاهرة',unit:'كرتونة',available_qty:500,min_wholesale_qty:10,wholesale_price:720,min_super_wholesale_qty:50,super_wholesale_price:680,status:'published',icon:'🛢️'},
+  {id:'p2',product_name_ar:'أرز مصري فاخر 25 كيلو',supplier_name:'مورد الدلتا للحبوب',category_name:'المواد الغذائية الجافة',governorate:'الدقهلية',unit:'كيس',available_qty:250,min_wholesale_qty:20,wholesale_price:950,min_super_wholesale_qty:100,super_wholesale_price:900,status:'published',icon:'🍚'},
+  {id:'p3',product_name_ar:'مكرونة 400 جرام - كرتونة',supplier_name:'المصرية للمكرونة',category_name:'المواد الغذائية الجافة',governorate:'الإسكندرية',unit:'كرتونة',available_qty:700,min_wholesale_qty:15,wholesale_price:420,min_super_wholesale_qty:80,super_wholesale_price:390,status:'published',icon:'🍝'},
+  {id:'p4',product_name_ar:'تونة قطع - كرتونة 48 علبة',supplier_name:'أغذية البحر',category_name:'المعلبات',governorate:'بورسعيد',unit:'كرتونة',available_qty:180,min_wholesale_qty:8,wholesale_price:1650,min_super_wholesale_qty:30,super_wholesale_price:1550,status:'published',icon:'🥫'}
+]
+const demoOrders = [
+  {order_number:'ORD-1001',buyer:'ماركت السلام',supplier:'شركة النيل للزيوت',governorate:'القاهرة',total_amount:18500,payment_method:'دفع عند الاستلام',order_status:'طلب جديد',created_at:'2026-05-20'},
+  {order_number:'ORD-1002',buyer:'مطعم الشيف',supplier:'مورد الدلتا للحبوب',governorate:'الجيزة',total_amount:42000,payment_method:'تحويل بنكي',order_status:'جاري التجهيز',created_at:'2026-05-19'}
+]
+
+function money(v){return `${Number(v||0).toLocaleString('ar-EG')} جنيه`}
+function calc(product, quantity){
+  const q = Number(quantity||0)
+  if(q < product.min_wholesale_qty) return {allowed:false, priceType:null, unitPrice:0, total:0, message:'الكمية أقل من الحد الأدنى للطلب.'}
+  if(q >= product.min_super_wholesale_qty) return {allowed:true, priceType:'super_wholesale', unitPrice:product.super_wholesale_price, total:q*product.super_wholesale_price, message:'تم تطبيق سعر جملة الجملة.'}
+  return {allowed:true, priceType:'wholesale', unitPrice:product.wholesale_price, total:q*product.wholesale_price, message:'تم تطبيق سعر الجملة.'}
+}
+async function getProducts(){
+  if(!supabase) return demoProducts
+  const {data,error} = await supabase.from('products').select('*, suppliers(company_name), categories(name_ar)').eq('status','published').order('created_at',{ascending:false})
+  if(error) throw error
+  return data.map(p=>({...p,supplier_name:p.suppliers?.company_name||'مورد',category_name:p.categories?.name_ar||'تصنيف'}))
+}
+async function getCategories(){
+  if(!supabase) return demoCategories
+  const {data,error} = await supabase.from('categories').select('*').eq('status','active').order('name_ar')
+  if(error) throw error
+  return data
+}
+async function registerSupplier(form){
+  if(!supabase) return console.log('Demo supplier',form)
+  const {data:authData,error:signUpError}=await supabase.auth.signUp({email:form.email,password:form.password})
+  if(signUpError) throw signUpError
+  const userId=authData.user.id
+  let r = await supabase.from('profiles').insert({id:userId,full_name:form.responsible_person,phone:form.phone,whatsapp:form.whatsapp,user_type:'supplier',status:'pending'})
+  if(r.error) throw r.error
+  r = await supabase.from('suppliers').insert({user_id:userId,company_name:form.company_name,responsible_person:form.responsible_person,governorate:form.governorate,delivery_areas:form.delivery_areas,verification_status:'pending'})
+  if(r.error) throw r.error
+}
+async function registerCustomer(form){
+  if(!supabase) return console.log('Demo customer',form)
+  const {data:authData,error:signUpError}=await supabase.auth.signUp({email:form.email,password:form.password})
+  if(signUpError) throw signUpError
+  const userId=authData.user.id
+  let r = await supabase.from('profiles').insert({id:userId,full_name:form.responsible_person,phone:form.phone,whatsapp:form.whatsapp,user_type:'customer',status:'active'})
+  if(r.error) throw r.error
+  r = await supabase.from('customers').insert({user_id:userId,business_name:form.business_name,responsible_person:form.responsible_person,business_type:form.business_type,governorate:form.governorate,address:form.address})
+  if(r.error) throw r.error
+}
+async function createProduct(form){
+  if(!supabase) return console.log('Demo product',form)
+  const {data,error}=await supabase.from('products').insert(form).select().single()
+  if(error) throw error
+  return data
 }
 
-export default function App() {
-  const [page, setPage] = useState('home')
-  const Page = pages[page] || Home
+function Header({page,setPage}){
+  const items=[['home','الرئيسية'],['products','المنتجات'],['categories','الفئات'],['supplier','انضم كمورد'],['customer','سجل كمشتري'],['contact','تواصل معنا']]
+  return <header className="card" style={{borderRadius:0,position:'sticky',top:0,zIndex:50}}><div className="container" style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:16}}>
+    <button onClick={()=>setPage('home')} style={{background:'none',border:0,fontSize:30,fontWeight:900,color:'var(--green)'}}>Tager</button>
+    <nav style={{display:'flex',gap:10,flexWrap:'wrap'}}>{items.map(([k,l])=><button key={k} onClick={()=>setPage(k)} className={page===k?'btn btn-primary':'btn btn-secondary'}>{l}</button>)}</nav>
+    <div className="btn-row"><button className="btn btn-gold" onClick={()=>setPage('products')}><ShoppingCart size={18}/> السلة</button><button className="btn btn-secondary"><Menu size={18}/></button></div>
+  </div></header>
+}
+function Footer({setPage}){return <footer className="section" style={{background:'var(--green)',color:'white'}}><div className="container grid grid3"><div><h2 style={{color:'white'}}>Tager</h2><p style={{color:'#e5e7eb'}}>منصة تجارة الجملة وجملة الجملة للمواد الغذائية في مصر.</p></div><div><h3 style={{color:'white'}}>روابط مهمة</h3><div className="btn-row"><button className="btn btn-secondary" onClick={()=>setPage('supplier')}>انضم كمورد</button><button className="btn btn-secondary" onClick={()=>setPage('customer')}>سجل كمشتري</button></div></div><div><h3 style={{color:'white'}}>تواصل</h3><p style={{color:'#e5e7eb'}}>الدعم متاح عبر واتساب.</p><a className="btn btn-gold" href={wa()} target="_blank">تواصل واتساب</a></div></div></footer>}
+function Hero({title,subtitle,highlight,primary,secondary,onPrimary,onSecondary,emoji='📦'}){return <section className="hero"><div className="container hero-inner"><div>{highlight&&<span className="badge">{highlight}</span>}<h1 style={{marginTop:16}}>{title}</h1><p style={{fontSize:18}}>{subtitle}</p><div className="btn-row" style={{marginTop:22}}>{primary&&<button className="btn btn-primary" onClick={onPrimary}>{primary}</button>}{secondary&&<button className="btn btn-secondary" onClick={onSecondary}>{secondary}</button>}</div></div><div className="hero-art">{emoji}</div></div></section>}
+function SectionTitle({title,subtitle}){return <div style={{marginBottom:24}}><h2>{title}</h2>{subtitle&&<p>{subtitle}</p>}</div>}
+function InfoCard({title,desc,icon='✅',button,onClick}){return <div className="card"><div style={{fontSize:42,marginBottom:10}}>{icon}</div><h3>{title}</h3><p>{desc}</p>{button&&<button className="btn btn-secondary" onClick={onClick}>{button}</button>}</div>}
+function StatCard({label,value,desc}){return <div className="card"><div className="stat-number">{value}</div><h3>{label}</h3><p className="small">{desc}</p></div>}
+function StatusBadge({status}){let cls='muted'; if((status||'').includes('منشور')||(status||'').includes('معتمد')||(status||'').includes('تم')) cls='ok'; if((status||'').includes('بانتظار')||(status||'').includes('جاري')||(status||'').includes('جديد')) cls='warn'; if((status||'').includes('مرفوض')||(status||'').includes('ملغي')) cls='bad'; return <span className={`status ${cls}`}>{status||'-'}</span>}
+function DataTable({columns,rows}){return <div className="table-wrap"><table className="table"><thead><tr>{columns.map(c=><th key={c.key||c}>{c.label||c}</th>)}</tr></thead><tbody>{rows.map((r,i)=><tr key={i}>{columns.map(c=><td key={c.key||c}>{c.render?c.render(r):(r[c.key||c]??'-')}</td>)}</tr>)}</tbody></table></div>}
+function CategoryCard({category,setPage}){return <div className="card"><div className="category-image">{category.icon||'🧺'}</div><h3 style={{marginTop:14}}>{category.name_ar}</h3><p>{category.description}</p><button className="btn btn-secondary" onClick={()=>setPage('products')}>عرض المنتجات</button></div>}
+function ProductCard({product}){const [qty,setQty]=useState(product.min_wholesale_qty||1); const price=calc(product,qty); return <div className="card"><div className="product-image">{product.icon||'📦'}</div><h3 style={{marginTop:14}}>{product.product_name_ar}</h3><p className="small">المورد: {product.supplier_name}</p><p className="small">المحافظة: {product.governorate} | وحدة البيع: {product.unit}</p><div className="price-box"><div><b>سعر الجملة</b><p className="small">من {product.min_wholesale_qty} {product.unit}</p><h3>{money(product.wholesale_price)}</h3></div><div><b>سعر جملة الجملة</b><p className="small">من {product.min_super_wholesale_qty} {product.unit}</p><h3>{money(product.super_wholesale_price)}</h3></div></div><label className="small">الكمية المطلوبة</label><input className="input" type="number" value={qty} onChange={e=>setQty(e.target.value)} min="1"/><p className={price.allowed?'badge':'notice'} style={{marginTop:10}}>{price.message}</p><h3>الإجمالي: {money(price.total)}</h3><div className="btn-row"><button className="btn btn-secondary">عرض التفاصيل</button><button className="btn btn-primary" disabled={!price.allowed}>إضافة للسلة</button></div></div>}
 
-  return (
-    <div className="app-shell">
-      <Header currentPage={page} onNavigate={setPage} />
-      <main>
-        <Page onNavigate={setPage} />
-      </main>
-      <Footer onNavigate={setPage} />
-    </div>
-  )
+function SupplierForm(){const [form,setForm]=useState({company_name:'',responsible_person:'',phone:'',whatsapp:'',email:'',password:'',governorate:'',delivery_areas:''}); const [msg,setMsg]=useState(''); const u=(k,v)=>setForm(f=>({...f,[k]:v})); async function submit(e){e.preventDefault();setMsg('جاري إرسال الطلب...');try{await registerSupplier(form);setMsg('تم إرسال طلب التسجيل كمورد بنجاح. سيتم مراجعة البيانات قريباً.')}catch(err){setMsg(err.message||'حدث خطأ')}} return <form className="card form" onSubmit={submit}><h2>نموذج تسجيل المورد</h2><div className="form-grid">{[['company_name','اسم الشركة أو النشاط التجاري'],['responsible_person','اسم المسؤول'],['phone','رقم الهاتف'],['whatsapp','رقم واتساب'],['email','البريد الإلكتروني'],['password','كلمة المرور'],['governorate','المحافظة'],['delivery_areas','مناطق التوصيل']].map(([k,p])=><input key={k} required={['company_name','responsible_person','phone','email','password'].includes(k)} type={k==='password'?'password':k==='email'?'email':'text'} className="input" placeholder={p} value={form[k]} onChange={e=>u(k,e.target.value)}/>)}</div><button className="btn btn-primary">إرسال طلب التسجيل كمورد</button>{msg&&<div className="notice">{msg}</div>}</form>}
+function CustomerForm(){const [form,setForm]=useState({business_name:'',responsible_person:'',business_type:'سوبر ماركت',phone:'',whatsapp:'',email:'',password:'',governorate:'',address:''}); const [msg,setMsg]=useState(''); const u=(k,v)=>setForm(f=>({...f,[k]:v})); async function submit(e){e.preventDefault();setMsg('جاري إرسال الطلب...');try{await registerCustomer(form);setMsg('تم إرسال طلب التسجيل كمشتري بنجاح.')}catch(err){setMsg(err.message||'حدث خطأ')}} return <form className="card form" onSubmit={submit}><h2>نموذج تسجيل المشتري</h2><div className="form-grid"><input required className="input" placeholder="اسم النشاط التجاري" value={form.business_name} onChange={e=>u('business_name',e.target.value)}/><input required className="input" placeholder="اسم المسؤول" value={form.responsible_person} onChange={e=>u('responsible_person',e.target.value)}/><select className="input" value={form.business_type} onChange={e=>u('business_type',e.target.value)}>{['بقالة','ميني ماركت','سوبر ماركت','مطعم','كافيه','فندق','موزع','تاجر جملة','شركة'].map(x=><option key={x}>{x}</option>)}</select>{[['phone','رقم الهاتف'],['whatsapp','رقم واتساب'],['email','البريد الإلكتروني'],['password','كلمة المرور'],['governorate','المحافظة']].map(([k,p])=><input key={k} required={['phone','email','password'].includes(k)} type={k==='password'?'password':k==='email'?'email':'text'} className="input" placeholder={p} value={form[k]} onChange={e=>u(k,e.target.value)}/>)}</div><textarea className="input" rows="3" placeholder="العنوان" value={form.address} onChange={e=>u('address',e.target.value)}/><button className="btn btn-primary">إرسال طلب التسجيل كمشتري</button>{msg&&<div className="notice">{msg}</div>}</form>}
+function ProductForm(){const [form,setForm]=useState({product_name_ar:'',category_id:'',brand:'',unit:'كرتونة',description:'',available_qty:0,min_wholesale_qty:10,wholesale_price:0,min_super_wholesale_qty:50,super_wholesale_price:0,governorate:'',delivery_areas:'',status:'pending'}); const [msg,setMsg]=useState(''); const u=(k,v)=>setForm(f=>({...f,[k]:v})); async function submit(e){e.preventDefault();setMsg('جاري حفظ المنتج...');try{await createProduct(form);setMsg('تم حفظ المنتج بنجاح، وسيتم مراجعته قبل النشر.')}catch(err){setMsg(err.message||'حدث خطأ')}} return <form className="card form" onSubmit={submit}><h2>إضافة منتج جديد</h2><div className="form-grid"><input required className="input" placeholder="اسم المنتج بالعربي" value={form.product_name_ar} onChange={e=>u('product_name_ar',e.target.value)}/><input className="input" placeholder="التصنيف" value={form.category_id} onChange={e=>u('category_id',e.target.value)}/><input className="input" placeholder="العلامة التجارية" value={form.brand} onChange={e=>u('brand',e.target.value)}/><select className="input" value={form.unit} onChange={e=>u('unit',e.target.value)}>{['كرتونة','كيس','عبوة','صندوق','طبلية','كيلو','طن'].map(x=><option key={x}>{x}</option>)}</select>{[['available_qty','الكمية المتاحة'],['min_wholesale_qty','أقل كمية جملة'],['wholesale_price','سعر الجملة'],['min_super_wholesale_qty','أقل كمية جملة الجملة'],['super_wholesale_price','سعر جملة الجملة']].map(([k,p])=><input key={k} type="number" className="input" placeholder={p} value={form[k]} onChange={e=>u(k,e.target.value)}/>) }<input className="input" placeholder="المحافظة" value={form.governorate} onChange={e=>u('governorate',e.target.value)}/></div><textarea className="input" rows="3" placeholder="وصف المنتج" value={form.description} onChange={e=>u('description',e.target.value)}/><input className="input" placeholder="مناطق التوصيل" value={form.delivery_areas} onChange={e=>u('delivery_areas',e.target.value)}/><button className="btn btn-primary">حفظ المنتج</button>{msg&&<div className="notice">{msg}</div>}</form>}
+function ContactForm(){const [form,setForm]=useState({name:'',phone:'',email:'',user_type:'استفسار عام',subject:'',message:''}); const [msg,setMsg]=useState(''); const u=(k,v)=>setForm(f=>({...f,[k]:v})); async function submit(e){e.preventDefault();setMsg('تم إرسال رسالتك بنجاح. سيتواصل معك فريق Tager قريباً.'); if(supabase) await supabase.from('contact_messages').insert(form)} return <form className="card form" onSubmit={submit}><h2>نموذج التواصل</h2><div className="form-grid"><input required className="input" placeholder="الاسم" value={form.name} onChange={e=>u('name',e.target.value)}/><input required className="input" placeholder="رقم الهاتف" value={form.phone} onChange={e=>u('phone',e.target.value)}/><input className="input" placeholder="البريد الإلكتروني" value={form.email} onChange={e=>u('email',e.target.value)}/><select className="input" value={form.user_type} onChange={e=>u('user_type',e.target.value)}><option>مورد</option><option>مشتري</option><option>استفسار عام</option></select></div><input className="input" placeholder="موضوع الرسالة" value={form.subject} onChange={e=>u('subject',e.target.value)}/><textarea className="input" rows="5" placeholder="الرسالة" value={form.message} onChange={e=>u('message',e.target.value)}/><button className="btn btn-primary">إرسال الرسالة</button>{msg&&<div className="notice">{msg}</div>}</form>}
+
+function Home({setPage}){return <><Hero title="منصة Tager لتجارة الجملة للمواد الغذائية في مصر" subtitle="Tager يربط بين موردي المواد الغذائية المعتمدين وبين التجار، السوبرماركت، المطاعم، الكافيهات، الفنادق والشركات في جميع محافظات مصر." highlight="أسعار جملة وجملة الجملة – كميات كبيرة – توصيل للمحافظات" primary="تسجيل كمورد" secondary="تسجيل مشتري" onPrimary={()=>setPage('supplier')} onSecondary={()=>setPage('customer')} emoji="🥫"/><section className="section"><div className="container"><SectionTitle title="ما هي منصة Tager؟" subtitle="منصة إلكترونية متخصصة في تجارة الجملة وجملة الجملة للمواد الغذائية في مصر."/><p>نساعد الموردين على عرض منتجاتهم بكميات وأسعار جملة، ونوفر للمشترين طريقة سهلة للمقارنة والطلب وتتبع الطلبات من مكان واحد.</p></div></section><section className="section"><div className="container"><SectionTitle title="الفئات الرئيسية" subtitle="استكشف أهم فئات المواد الغذائية المتاحة."/><div className="grid grid4">{demoCategories.map(c=><CategoryCard key={c.id} category={c} setPage={setPage}/>)}</div></div></section><section className="section"><div className="container"><SectionTitle title="كيف تعمل Tager؟"/><div className="grid grid4"><InfoCard icon="1️⃣" title="تسجيل سريع" desc="يسجل الموردون والمشترون حساباتهم في دقائق."/><InfoCard icon="2️⃣" title="تأكيد الموردين" desc="مراجعة واعتماد الموردين لضمان الجودة."/><InfoCard icon="3️⃣" title="تصفح وطلب" desc="اختر المنتجات والكمية ويظهر السعر تلقائياً."/><InfoCard icon="4️⃣" title="إدارة وتسليم" desc="تابع الطلب حتى التجهيز والتسليم."/></div></div></section><section className="section"><div className="container grid grid2"><InfoCard icon="🏭" title="مميزات الموردين" desc="اعرض منتجاتك وحدد أسعار الجملة واستقبل طلبات جديدة." button="انضم كمورد" onClick={()=>setPage('supplier')}/><InfoCard icon="🛒" title="مميزات المشترين" desc="قارن الأسعار واحصل على سعر الجملة وجملة الجملة حسب الكمية." button="سجل كمشتري" onClick={()=>setPage('customer')}/></div></section></>}
+function Products(){const [products,setProducts]=useState([]); const [loading,setLoading]=useState(true); useEffect(()=>{getProducts().then(setProducts).catch(()=>setProducts(demoProducts)).finally(()=>setLoading(false))},[]); return <><Hero title="تصفح منتجات الجملة على Tager" subtitle="اكتشف مواد غذائية بأسعار جملة وجملة الجملة من موردين معتمدين." highlight="حدد الكمية وشاهد السعر المناسب تلقائياً" emoji="🛍️"/><section className="section"><div className="container card"><h2>فلتر المنتجات</h2><div className="filters"><select className="input"><option>التصنيف</option></select><select className="input"><option>المحافظة</option></select><select className="input"><option>المورد</option></select><input className="input" placeholder="السعر من"/><input className="input" placeholder="الحد الأدنى"/><select className="input"><option>متاح للتوصيل</option></select></div></div></section><section className="section"><div className="container"><SectionTitle title="نتائج المنتجات" subtitle="اطلع على الأسعار وحدود الكمية." />{loading?<div className="notice">جاري تحميل المنتجات...</div>:<div className="grid grid3">{products.map(p=><ProductCard key={p.id} product={p}/>)}</div>}</div></section></>}
+function Categories({setPage}){const [cats,setCats]=useState([]); useEffect(()=>{getCategories().then(setCats).catch(()=>setCats(demoCategories))},[]); return <><Hero title="فئات المواد الغذائية على Tager" subtitle="اختر الفئة المناسبة وابدأ تصفح منتجات الجملة." highlight="فئات واضحة للوصول للمنتجات بسرعة" emoji="🧺"/><section className="section"><div className="container"><div className="grid grid4">{cats.map(c=><CategoryCard key={c.id} category={c} setPage={setPage}/>)}</div></div></section></>}
+function SupplierJoin(){return <><Hero title="انضم إلى Tager كمورد مواد غذائية" subtitle="اعرض منتجاتك بالجملة وجملة الجملة ووصل للتجار والسوبرماركت والمطاعم في مصر." highlight="عملاء جملة حقيقيين – أسعار واضحة – حد أدنى للطلب" primary="تسجيل كمورد الآن" secondary="تواصل واتساب" onSecondary={()=>window.open(wa(),'_blank')} emoji="🏭"/><section className="section"><div className="container grid grid3"><InfoCard title="عملاء جدد" desc="الوصول إلى تجار ومطاعم في المحافظات." icon="📈"/><InfoCard title="أسعار مرنة" desc="تحديد سعر الجملة وجملة الجملة." icon="💰"/><InfoCard title="إدارة سهلة" desc="متابعة المنتجات والطلبات من لوحة المورد." icon="⚙️"/></div></section><section className="section"><div className="container"><SupplierForm/></div></section></>}
+function CustomerJoin({setPage}){return <><Hero title="اشترِ مواد غذائية بالجملة من موردين معتمدين" subtitle="تصفح المنتجات، قارن الأسعار، اختر الكمية، واحصل على السعر تلقائياً حسب كمية الطلب." highlight="منصة واحدة تربطك بموردي الجملة" primary="سجل كمشتري الآن" secondary="تصفح المنتجات" onSecondary={()=>setPage('products')} emoji="🛒"/><section className="section"><div className="container grid grid4"><InfoCard title="مقارنة الأسعار" desc="قارن الموردين في مكان واحد." icon="🔎"/><InfoCard title="أسعار حسب الكمية" desc="جملة وجملة الجملة." icon="💸"/><InfoCard title="موردين معتمدين" desc="موردون موثوقون." icon="✅"/><InfoCard title="متابعة الطلبات" desc="تابع الطلب حتى التسليم." icon="🚚"/></div></section><section className="section"><div className="container"><CustomerForm/></div></section></>}
+function SupplierDashboard(){const cols=[{key:'order_number',label:'رقم الطلب'},{key:'buyer',label:'العميل'},{key:'governorate',label:'المحافظة'},{key:'total_amount',label:'القيمة',render:r=>money(r.total_amount)},{key:'payment_method',label:'الدفع'},{key:'order_status',label:'الحالة',render:r=><StatusBadge status={r.order_status}/>}]; return <section className="section"><div className="container dashboard"><aside className="sidebar">{['نظرة عامة','منتجاتي','إضافة منتج','الطلبات','المخزون','الدعم'].map((x,i)=><button key={x} className={i?'btn btn-secondary':'btn btn-primary'}>{x}</button>)}</aside><div className="grid"><div className="card"><h1>لوحة المورد</h1><p>إدارة المنتجات والطلبات والأسعار.</p></div><div className="stats"><StatCard label="عدد المنتجات" value="0" desc="إجمالي المنتجات"/><StatCard label="طلبات جديدة" value="0" desc="تحتاج مراجعة"/><StatCard label="المبيعات" value="0 جنيه" desc="مؤكدة"/><StatCard label="منخفض المخزون" value="0" desc="تنبيهات"/></div><ProductForm/><div className="card"><h2>الطلبات</h2><DataTable columns={cols} rows={demoOrders}/></div></div></div></section>}
+function CustomerDashboard(){const cols=[{key:'order_number',label:'رقم الطلب'},{key:'supplier',label:'المورد'},{key:'total_amount',label:'القيمة',render:r=>money(r.total_amount)},{key:'payment_method',label:'الدفع'},{key:'order_status',label:'الحالة',render:r=><StatusBadge status={r.order_status}/>}]; return <section className="section"><div className="container dashboard"><aside className="sidebar">{['نظرة عامة','طلباتي','المحفوظات','بيانات النشاط','العناوين','الدعم'].map((x,i)=><button key={x} className={i?'btn btn-secondary':'btn btn-primary'}>{x}</button>)}</aside><div className="grid"><div className="card"><h1>لوحة المشتري</h1><p>متابعة الطلبات والمنتجات المحفوظة.</p></div><div className="stats"><StatCard label="عدد الطلبات" value="0" desc="كل الطلبات"/><StatCard label="الجارية" value="0" desc="قيد التنفيذ"/><StatCard label="المحفوظة" value="0" desc="منتجات"/><StatCard label="الإجمالي" value="0 جنيه" desc="قيمة الطلبات"/></div><div className="card"><h2>طلباتي</h2><DataTable columns={cols} rows={demoOrders}/></div></div></div></section>}
+function AdminDashboard(){const cols=[{key:'order_number',label:'رقم الطلب'},{key:'buyer',label:'المشتري'},{key:'supplier',label:'المورد'},{key:'governorate',label:'المحافظة'},{key:'total_amount',label:'القيمة',render:r=>money(r.total_amount)},{key:'order_status',label:'الحالة',render:r=><StatusBadge status={r.order_status}/>}]; return <section className="section"><div className="container dashboard"><aside className="sidebar">{['نظرة عامة','الموردين','المشترين','المنتجات','الطلبات','الفئات','العمولات','المدفوعات','الشكاوى','التقارير'].map((x,i)=><button key={x} className={i?'btn btn-secondary':'btn btn-primary'}>{x}</button>)}</aside><div className="grid"><div className="card"><h1>لوحة الإدارة</h1><p>إدارة منصة Tager والموردين والمنتجات والطلبات.</p><span className="badge">وصول إداري فقط</span></div><div className="stats"><StatCard label="الموردين" value="0" desc="إجمالي"/><StatCard label="بانتظار الاعتماد" value="0" desc="مراجعة"/><StatCard label="المنتجات" value="0" desc="إجمالي"/><StatCard label="العمولات" value="0 جنيه" desc="مستحقة"/></div><div className="card"><h2>إدارة الطلبات</h2><DataTable columns={cols} rows={demoOrders}/></div></div></div></section>}
+function Contact({setPage}){return <><Hero title="تواصل مع فريق Tager" subtitle="نحن هنا لمساعدة الموردين والمشترين في التسجيل والمنتجات والطلبات." highlight="اختر طريقة التواصل المناسبة وسيرد عليك فريقنا قريباً" emoji="☎️"/><section className="section"><div className="container grid grid4"><InfoCard title="واتساب" desc="للاستفسارات السريعة." button="تواصل واتساب" onClick={()=>window.open(wa(),'_blank')} icon="💬"/><InfoCard title="الهاتف" desc="اتصل بفريق Tager." icon="📞"/><InfoCard title="البريد" desc="للمراسلات الرسمية." icon="📧"/><InfoCard title="نموذج" desc="املأ النموذج وسنرد عليك." icon="📝"/></div></section><section className="section"><div className="container"><ContactForm/></div></section><section className="section"><div className="container card"><h2>ابدأ رحلتك مع Tager اليوم</h2><p>سواء كنت موردًا أو مشتريًا، فريق Tager جاهز لمساعدتك.</p><div className="btn-row"><button className="btn btn-primary" onClick={()=>setPage('supplier')}>انضم كمورد</button><button className="btn btn-secondary" onClick={()=>setPage('customer')}>سجل كمشتري</button><button className="btn btn-gold" onClick={()=>setPage('products')}>تصفح المنتجات</button></div></div></section></>}
+
+export default function App(){
+  const [page,setPage]=useState('home')
+  const pages={home:<Home setPage={setPage}/>,products:<Products setPage={setPage}/>,categories:<Categories setPage={setPage}/>,supplier:<SupplierJoin setPage={setPage}/>,customer:<CustomerJoin setPage={setPage}/>,supplierDashboard:<SupplierDashboard/>,customerDashboard:<CustomerDashboard/>,admin:<AdminDashboard/>,contact:<Contact setPage={setPage}/>}
+  return <><Header page={page} setPage={setPage}/>{pages[page]||pages.home}<section className="section"><div className="container card"><h2>روابط داخلية للاختبار</h2><p>هذه الروابط لا تظهر في القائمة العامة. استخدمها أثناء التطوير فقط.</p><div className="btn-row"><button className="btn btn-secondary" onClick={()=>setPage('supplierDashboard')}>لوحة المورد</button><button className="btn btn-secondary" onClick={()=>setPage('customerDashboard')}>لوحة المشتري</button><button className="btn btn-secondary" onClick={()=>setPage('admin')}>لوحة الإدارة</button></div></div></section><Footer setPage={setPage}/></>
 }
