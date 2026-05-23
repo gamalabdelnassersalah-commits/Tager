@@ -1,18 +1,10 @@
-# Tager Full Ready Project
+# Tager No-SRC Vercel Version
 
-مشروع كامل جاهز كبداية قوية لمنصة **Tager** لتجارة الجملة وجملة الجملة للمواد الغذائية في مصر.
+هذه النسخة مخصصة لحل خطأ Vercel الخاص بـ `/src/main.jsx`.
 
-## يحتوي على
-- React + Vite
-- RTL عربي كامل
-- Supabase Backend جاهز
-- Demo Mode يعمل بدون Supabase
-- صفحات: الرئيسية، المنتجات، الفئات، المورد، المشتري، لوحات التحكم، تواصل معنا
-- تسجيل مورد ومشتري
-- إضافة منتج
-- منطق سعر الجملة وجملة الجملة
-- SQL كامل للجداول والحماية RLS
-- جاهز للنشر على Vercel
+## لماذا؟
+بعض الرفع على Vercel لا يرفع فولدر `src` بشكل صحيح.  
+هذه النسخة تستخدم `main.jsx` في الجذر مباشرة.
 
 ## التشغيل
 ```bash
@@ -20,20 +12,17 @@ npm install
 npm run dev
 ```
 
-## البناء
-```bash
-npm run build
-```
+## النشر على Vercel
+تأكد أن الملفات التالية في Root مباشرة:
+- index.html
+- main.jsx
+- style.css
+- package.json
+- vite.config.js
+- vercel.json
 
-## Supabase
-1. أنشئ مشروع Supabase.
-2. شغّل `supabase/schema.sql`.
-3. شغّل `supabase/seed.sql`.
-4. انسخ `.env.example` إلى `.env`.
-5. ضع URL و ANON KEY.
-
-## Vercel
+الإعدادات:
 - Framework: Vite
 - Build Command: npm run build
 - Output Directory: dist
-- Root Directory: empty
+- Root Directory: فارغ
