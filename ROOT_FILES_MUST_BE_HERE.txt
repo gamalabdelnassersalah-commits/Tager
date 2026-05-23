@@ -1,0 +1,9 @@
+هذه الملفات يجب أن تكون في Root Directory على Vercel:
+index.html
+package.json
+vite.config.js
+vercel.json
+src/main.jsx
+
+لو ظهر Could not resolve /src/main.jsx فهذا يعني أن Vercel لا يرى فولدر src.
+الحل: ارفع محتويات هذا الفولدر نفسها، وليس فولدر خارجي يحتويها.
