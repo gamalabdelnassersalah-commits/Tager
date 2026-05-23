@@ -1,28 +1,38 @@
-# Tager No-SRC Vercel Version
+# AI Projects Platform - Local Smart Engine
 
-هذه النسخة مخصصة لحل خطأ Vercel الخاص بـ `/src/main.jsx`.
+منصة إدارة مشاريع عربية RTL تعمل بدون أي API.
 
-## لماذا؟
-بعض الرفع على Vercel لا يرفع فولدر `src` بشكل صحيح.  
-هذه النسخة تستخدم `main.jsx` في الجذر مباشرة.
+## ماذا يعني بدون API؟
+التحليل داخل المنصة لا يستخدم OpenAI ولا أي خدمة خارجية. التحليل يعمل من خلال JavaScript داخل المتصفح باستخدام:
+
+- Risk Scoring
+- Delay Probability
+- Budget Variance
+- Manpower Gap
+- Consumption Analysis
+- Rule-Based Recommendations
+- Local Report Generator
+- Simple Text Document Analyzer
 
 ## التشغيل
+
 ```bash
 npm install
 npm run dev
 ```
 
-## النشر على Vercel
-تأكد أن الملفات التالية في Root مباشرة:
-- index.html
-- main.jsx
-- style.css
-- package.json
-- vite.config.js
-- vercel.json
+## البناء للرفع على Vercel
 
-الإعدادات:
-- Framework: Vite
-- Build Command: npm run build
-- Output Directory: dist
-- Root Directory: فارغ
+```bash
+npm run build
+```
+
+Output Directory:
+
+```text
+dist
+```
+
+## ملاحظة مهمة
+هذا ليس ذكاء اصطناعي حقيقي مثل ChatGPT، لكنه محرك تحليل ذكي داخلي بدون إنترنت وبدون مفاتيح API.
+يمكن تطويره لاحقاً بإضافة قواعد أكثر أو قاعدة بيانات محلية.
