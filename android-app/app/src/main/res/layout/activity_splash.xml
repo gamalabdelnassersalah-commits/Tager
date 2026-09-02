@@ -8,9 +8,11 @@
     android:background="@color/tager_mint">
 
     <ImageView
-        android:layout_width="180dp"
-        android:layout_height="180dp"
-        android:src="@drawable/tager_icon"
+        android:layout_width="190dp"
+        android:layout_height="190dp"
+        android:adjustViewBounds="true"
+        android:scaleType="fitCenter"
+        android:src="@drawable/tager_launcher"
         android:contentDescription="Tager" />
 
     <TextView
