@@ -21,10 +21,10 @@ jobs:
           set -euo pipefail
           mkdir -p android-app/app/src/main/res/drawable-nodpi
           curl --fail --location --retry 3 \
-            "https://raw.githubusercontent.com/gamalabdelnassersalah-commits/tager-new/2e7c04ab7177e7e2e1600d445e797800045007e2/tager-logo-full.png" \
+            "https://raw.githubusercontent.com/gamalabdelnassersalah-commits/tager-new/main/tager-logo-full.png" \
             -o android-app/app/src/main/res/drawable-nodpi/tager_brand_full.png
           curl --fail --location --retry 3 \
-            "https://raw.githubusercontent.com/gamalabdelnassersalah-commits/tager-new/2e7c04ab7177e7e2e1600d445e797800045007e2/icon-512.png" \
+            "https://raw.githubusercontent.com/gamalabdelnassersalah-commits/tager-new/main/icon-512.png" \
             -o android-app/app/src/main/res/drawable-nodpi/tager_launcher.png
           python3 - <<'PY'
           from pathlib import Path
