@@ -15,21 +15,17 @@ jobs:
       - name: Checkout Android app
         uses: actions/checkout@v4
 
-      - name: Checkout stable Tager artwork source
-        uses: actions/checkout@v4
-        with:
-          repository: gamalabdelnassersalah-commits/tager-new
-          ref: main
-          path: .tager-artwork-source
-          persist-credentials: false
-
       - name: Install and verify original Tager artwork
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p android-app/app/src/main/res/drawable-nodpi
-          cp .tager-artwork-source/tager-logo-full.png android-app/app/src/main/res/drawable-nodpi/tager_brand_full.png
-          cp .tager-artwork-source/icon-512.png android-app/app/src/main/res/drawable-nodpi/tager_launcher.png
+          curl --fail --location --retry 3 --retry-delay 2 \
+            "https://tager-new.vercel.app/tager-logo-full.png" \
+            -o android-app/app/src/main/res/drawable-nodpi/tager_brand_full.png
+          curl --fail --location --retry 3 --retry-delay 2 \
+            "https://tager-new.vercel.app/icon-512.png" \
+            -o android-app/app/src/main/res/drawable-nodpi/tager_launcher.png
           python3 - <<'PY'
           from pathlib import Path
           for name in ('tager_brand_full.png', 'tager_launcher.png'):
@@ -37,7 +33,7 @@ jobs:
               data = p.read_bytes()
               assert data[:8] == b'\x89PNG\r\n\x1a\n', f'{name} is not a valid PNG'
               assert len(data) > 10000, f'{name} is unexpectedly small'
-              print(name, len(data), 'bytes: OK')
+              print(name, len(data), 'bytes: PNG verified')
           PY
 
       - name: Set up Java 17
