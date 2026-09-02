@@ -1,10 +1,12 @@
 package com.tager.marketplace;
 
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.app.DownloadManager;
 import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.net.ConnectivityManager;
 import android.net.Network;
@@ -42,6 +44,8 @@ public class MainActivity extends Activity {
     private static final String HOME_BASE_URL = "https://tager-new.vercel.app/";
     private static final int FILE_CHOOSER_REQUEST = 4101;
     private static final String EXTRA_RECOVERY_PAGE = "tager_recovery_page";
+    private static final String PREFS_NAME = "tager_app_state";
+    private static final String PREF_LAST_PAGE = "last_page";
 
     private WebView webView;
     private ProgressBar progressBar;
@@ -60,12 +64,14 @@ public class MainActivity extends Activity {
     private ConnectivityManager connectivityManager;
     private ConnectivityManager.NetworkCallback networkCallback;
     private boolean networkCallbackRegistered = false;
+    private SharedPreferences preferences;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         webView = findViewById(R.id.webView);
         progressBar = findViewById(R.id.progressBar);
         nativeLoading = findViewById(R.id.nativeLoading);
@@ -83,20 +89,27 @@ public class MainActivity extends Activity {
         registerConnectivityWatcher();
 
         if (savedInstanceState == null) {
-            String requestedPage = sanitizePage(getIntent().getStringExtra(EXTRA_RECOVERY_PAGE));
-            if (isOnline()) {
-                showLoading(true);
-                webView.loadUrl(getPageUrl(requestedPage));
-            } else {
-                updateSelectedNavigation(requestedPage);
-                showOffline();
+            String requestedPage = resolveRequestedPage(getIntent());
+            updateSelectedNavigation(requestedPage);
+            showLoading(true);
+            if (!isOnline()) {
+                webView.getSettings().setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
             }
+            webView.loadUrl(getPageUrl(requestedPage));
         } else {
             webView.restoreState(savedInstanceState);
             firstPageLoaded = webView.getUrl() != null;
             showLoading(false);
             syncNavigationFromUrl(webView.getUrl());
         }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        String requestedPage = resolveRequestedPage(intent);
+        navigateTo(requestedPage);
     }
 
     private String getPageUrl(String page) {
@@ -118,18 +131,51 @@ public class MainActivity extends Activity {
         }
     }
 
+    private String resolveRequestedPage(Intent intent) {
+        if (intent != null) {
+            String recovery = intent.getStringExtra(EXTRA_RECOVERY_PAGE);
+            if (recovery != null && !recovery.isEmpty()) return sanitizePage(recovery);
+
+            Uri data = intent.getData();
+            if (data != null) {
+                String scheme = data.getScheme() == null ? "" : data.getScheme().toLowerCase();
+                if ("tager".equals(scheme)) {
+                    String host = data.getHost();
+                    if (host != null && !host.isEmpty() && !"open".equalsIgnoreCase(host)) {
+                        return sanitizePage(host);
+                    }
+                    String lastPath = data.getLastPathSegment();
+                    if (lastPath != null && !lastPath.isEmpty()) return sanitizePage(lastPath);
+                }
+                if (("http".equals(scheme) || "https".equals(scheme)) && isTagerHost(data.getHost())) {
+                    String fragment = data.getFragment();
+                    return fragment == null || fragment.isEmpty() ? "home" : sanitizePage(fragment);
+                }
+            }
+        }
+        return sanitizePage(preferences == null ? "home" : preferences.getString(PREF_LAST_PAGE, "home"));
+    }
+
+    private void rememberPage(String page) {
+        page = sanitizePage(page);
+        if (preferences == null) return;
+        String current = preferences.getString(PREF_LAST_PAGE, "home");
+        if (!page.equals(current)) preferences.edit().putString(PREF_LAST_PAGE, page).apply();
+    }
+
     private void configureNativeNavigation() {
         navHome.setOnClickListener(v -> navigateTo("home"));
         navProducts.setOnClickListener(v -> navigateTo("products"));
         navSuppliers.setOnClickListener(v -> navigateTo("suppliers"));
         navTrack.setOnClickListener(v -> navigateTo("track"));
         navCart.setOnClickListener(v -> navigateTo("cart"));
-        updateSelectedNavigation("home");
+        updateSelectedNavigation(resolveRequestedPage(getIntent()));
     }
 
     private void navigateTo(String page) {
         page = sanitizePage(page);
-        offlinePanel.setVisibility(View.GONE);
+        rememberPage(page);
+        if (offlinePanel != null) offlinePanel.setVisibility(View.GONE);
         updateSelectedNavigation(page);
 
         if (webView == null) return;
@@ -141,21 +187,22 @@ public class MainActivity extends Activity {
             return;
         }
 
-        if (!isOnline()) {
-            showOffline();
-            return;
-        }
-
+        if (!isOnline()) webView.getSettings().setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
+        else webView.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
         showLoading(true);
         webView.loadUrl(getPageUrl(page));
+    }
+
+    private boolean isTagerHost(String host) {
+        if (host == null || host.isEmpty()) return false;
+        String normalized = host.toLowerCase();
+        return "tager-new.vercel.app".equals(normalized) || normalized.endsWith(".tager-new.vercel.app");
     }
 
     private boolean isTagerUrl(String url) {
         if (url == null || url.isEmpty()) return false;
         try {
-            Uri uri = Uri.parse(url);
-            String host = uri.getHost();
-            return host != null && ("tager-new.vercel.app".equalsIgnoreCase(host) || host.toLowerCase().endsWith(".tager-new.vercel.app"));
+            return isTagerHost(Uri.parse(url).getHost());
         } catch (Exception ignored) {
             return false;
         }
@@ -163,10 +210,13 @@ public class MainActivity extends Activity {
 
     private void syncNavigationFromUrl(String url) {
         if (url == null) return;
-        updateSelectedNavigation(pageFromUrl(url));
+        String page = pageFromUrl(url);
+        rememberPage(page);
+        updateSelectedNavigation(page);
     }
 
     private void updateSelectedNavigation(String page) {
+        page = sanitizePage(page);
         navHome.setSelected("home".equals(page));
         navProducts.setSelected("products".equals(page));
         navSuppliers.setSelected("suppliers".equals(page));
@@ -193,6 +243,13 @@ public class MainActivity extends Activity {
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         s.setUserAgentString(s.getUserAgentString() + " TagerAndroidApp/" + BuildConfig.VERSION_NAME);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            ActivityManager activityManager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            if (activityManager == null || !activityManager.isLowRamDevice()) {
+                s.setOffscreenPreRaster(true);
+            }
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             s.setSafeBrowsingEnabled(true);
             webView.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_BOUND, false);
@@ -222,7 +279,7 @@ public class MainActivity extends Activity {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
-                offlinePanel.setVisibility(View.GONE);
+                if (offlinePanel != null) offlinePanel.setVisibility(View.GONE);
                 if (!firstPageLoaded) showLoading(true);
             }
 
@@ -231,7 +288,7 @@ public class MainActivity extends Activity {
                 super.onPageCommitVisible(view, url);
                 firstPageLoaded = true;
                 showLoading(false);
-                offlinePanel.setVisibility(View.GONE);
+                if (offlinePanel != null) offlinePanel.setVisibility(View.GONE);
                 syncNavigationFromUrl(url);
             }
 
@@ -240,7 +297,8 @@ public class MainActivity extends Activity {
                 super.onPageFinished(view, url);
                 firstPageLoaded = true;
                 showLoading(false);
-                offlinePanel.setVisibility(View.GONE);
+                if (offlinePanel != null) offlinePanel.setVisibility(View.GONE);
+                if (isOnline()) view.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
                 CookieManager.getInstance().flush();
                 syncNavigationFromUrl(url);
                 injectAppPresentation(view);
@@ -261,6 +319,7 @@ public class MainActivity extends Activity {
             @Override
             public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
                 String recoveryPage = pageFromUrl(view == null ? null : view.getUrl());
+                rememberPage(recoveryPage);
                 if (fileCallback != null) {
                     fileCallback.onReceiveValue(null);
                     fileCallback = null;
@@ -275,7 +334,7 @@ public class MainActivity extends Activity {
             public void onProgressChanged(WebView view, int newProgress) {
                 progressBar.setProgress(newProgress);
                 progressBar.setVisibility(newProgress >= 100 ? View.GONE : View.VISIBLE);
-                if (!firstPageLoaded && newProgress >= 65) showLoading(false);
+                if (!firstPageLoaded && newProgress >= 60) showLoading(false);
             }
 
             @Override
@@ -302,9 +361,13 @@ public class MainActivity extends Activity {
                 touchStartY = event.getY();
             } else if (event.getAction() == MotionEvent.ACTION_UP) {
                 float distance = event.getY() - touchStartY;
-                if (webView.getScrollY() == 0 && distance > 420) {
-                    if (isOnline()) webView.reload();
-                    else showOffline();
+                if (webView.getScrollY() == 0 && distance > 460) {
+                    if (isOnline()) {
+                        webView.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
+                        webView.reload();
+                    } else {
+                        showOffline();
+                    }
                 }
             }
             return false;
@@ -327,6 +390,7 @@ public class MainActivity extends Activity {
             @Override
             public void onAvailable(Network network) {
                 runOnUiThread(() -> {
+                    if (webView != null) webView.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
                     if (offlinePanel != null && offlinePanel.getVisibility() == View.VISIBLE && webView != null) {
                         retryCurrentPage();
                     }
@@ -356,6 +420,7 @@ public class MainActivity extends Activity {
                 "document.documentElement.classList.add('tager-native-android');" +
                 "document.body.classList.add('tager-native-android');" +
                 "document.documentElement.style.webkitTextSizeAdjust='100%';" +
+                "if(!window.__tagerNativeLinks){window.__tagerNativeLinks=true;document.addEventListener('click',function(e){var t=e.target;var a=t&&t.closest?t.closest('a[target=\\\"_blank\\\"]'):null;if(a){a.target='_self';}},true);}" +
                 "})();";
         view.evaluateJavascript(script, null);
     }
@@ -365,10 +430,13 @@ public class MainActivity extends Activity {
         String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase();
         String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase();
 
-        if (("http".equals(scheme) || "https".equals(scheme)) &&
-                ("tager-new.vercel.app".equals(host) || host.endsWith(".tager-new.vercel.app"))) return false;
+        if (("http".equals(scheme) || "https".equals(scheme)) && isTagerHost(host)) return false;
 
         try {
+            if ("tager".equals(scheme)) {
+                navigateTo(resolvePageFromTagerUri(uri));
+                return true;
+            }
             if ("intent".equals(scheme)) {
                 startActivity(Intent.parseUri(uri.toString(), Intent.URI_INTENT_SCHEME));
                 return true;
@@ -384,6 +452,13 @@ public class MainActivity extends Activity {
             return true;
         }
         return false;
+    }
+
+    private String resolvePageFromTagerUri(Uri uri) {
+        if (uri == null) return "home";
+        String host = uri.getHost();
+        if (host != null && !host.isEmpty() && !"open".equalsIgnoreCase(host)) return sanitizePage(host);
+        return sanitizePage(uri.getLastPathSegment());
     }
 
     private void startDownload(String url, String userAgent, String contentDisposition, String mimetype) {
@@ -484,12 +559,14 @@ public class MainActivity extends Activity {
             Toast.makeText(this, "لا يوجد اتصال بالإنترنت", Toast.LENGTH_SHORT).show();
             return;
         }
-        offlinePanel.setVisibility(View.GONE);
+        if (offlinePanel != null) offlinePanel.setVisibility(View.GONE);
         if (webView == null) return;
+        webView.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
         String currentUrl = webView.getUrl();
         if (currentUrl == null || currentUrl.startsWith("about:")) {
             showLoading(true);
-            webView.loadUrl(getPageUrl("home"));
+            String lastPage = preferences == null ? "home" : preferences.getString(PREF_LAST_PAGE, "home");
+            webView.loadUrl(getPageUrl(lastPage));
         } else {
             webView.reload();
         }
@@ -539,6 +616,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onPause() {
         if (webView != null) {
+            rememberPage(pageFromUrl(webView.getUrl()));
             webView.onPause();
             webView.pauseTimers();
         }
@@ -573,6 +651,11 @@ public class MainActivity extends Activity {
         }
         if (webView != null && webView.canGoBack()) {
             webView.goBack();
+            return;
+        }
+        String currentPage = webView == null ? "home" : pageFromUrl(webView.getUrl());
+        if (!"home".equals(currentPage)) {
+            navigateTo("home");
             return;
         }
         long now = System.currentTimeMillis();
