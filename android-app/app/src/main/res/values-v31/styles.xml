@@ -4,6 +4,5 @@
         <item name="android:windowSplashScreenBackground">@color/white</item>
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/tager_icon</item>
         <item name="android:windowSplashScreenIconBackgroundColor">@color/white</item>
-        <item name="android:postSplashScreenTheme">@style/Theme.Tager</item>
     </style>
 </resources>
