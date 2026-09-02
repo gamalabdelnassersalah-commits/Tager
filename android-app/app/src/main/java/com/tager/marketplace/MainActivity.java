@@ -494,7 +494,7 @@ public class MainActivity extends Activity {
         }
         long now = System.currentTimeMillis();
         if (now - lastBackPressedAt < 1800) {
-            super.onBackPressed();
+            moveTaskToBack(true);
         } else {
             lastBackPressedAt = now;
             Toast.makeText(this, "اضغط رجوع مرة أخرى للخروج", Toast.LENGTH_SHORT).show();
