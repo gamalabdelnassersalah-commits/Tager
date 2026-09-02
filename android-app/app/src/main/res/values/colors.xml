@@ -4,5 +4,6 @@
     <color name="tager_teal_dark">#063F35</color>
     <color name="tager_orange">#F47414</color>
     <color name="tager_mint">#EDF5F2</color>
+    <color name="tager_text_muted">#66756F</color>
     <color name="white">#FFFFFF</color>
 </resources>
