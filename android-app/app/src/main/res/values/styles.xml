@@ -7,5 +7,11 @@
         <item name="android:navigationBarColor">@color/tager_teal_dark</item>
         <item name="android:colorAccent">@color/tager_orange</item>
         <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+
+    <style name="Theme.Tager.Starting" parent="@style/Theme.Tager">
+        <item name="android:windowBackground">@color/white</item>
+        <item name="android:windowDisablePreview">false</item>
     </style>
 </resources>
