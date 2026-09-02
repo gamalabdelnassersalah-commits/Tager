@@ -1,9 +1,9 @@
-name: Validate Tager Android 1.4.0
+name: Build Tager Android 1.4.0
 
 on:
   workflow_dispatch:
   push:
-    branches: [ android-v1.4-performance ]
+    branches: [ main ]
     paths:
       - 'android-app/**'
       - '.github/workflows/tager-android-build.yml'
@@ -36,19 +36,19 @@ jobs:
         working-directory: android-app
         run: gradle --no-daemon :app:assembleDebug :app:bundleRelease
 
-      - name: Prepare validation outputs
+      - name: Prepare outputs
         run: |
-          cp android-app/app/build/outputs/apk/debug/app-debug.apk Tager-v1.4.0-test.apk
+          cp android-app/app/build/outputs/apk/debug/app-debug.apk Tager-v1.4.0.apk
           cp android-app/app/build/outputs/bundle/release/app-release.aab Tager-v1.4.0-unsigned.aab
 
-      - name: Upload test APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Tager-v1.4.0-test-APK
-          path: Tager-v1.4.0-test.apk
+          name: Tager-v1.4.0-APK
+          path: Tager-v1.4.0.apk
           retention-days: 30
 
-      - name: Upload unsigned release bundle
+      - name: Upload unsigned AAB
         uses: actions/upload-artifact@v4
         with:
           name: Tager-v1.4.0-unsigned-AAB
