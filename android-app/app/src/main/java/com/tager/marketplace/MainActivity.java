@@ -31,8 +31,13 @@ import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
+import androidx.core.content.FileProvider;
+
+import java.io.File;
+import java.io.IOException;
+
 public class MainActivity extends Activity {
-    private static final String HOME_URL = "https://tager-new.vercel.app/?tager_app=android&branding=20260902&app_version=110#home";
+    private static final String HOME_BASE_URL = "https://tager-new.vercel.app/";
     private static final int FILE_CHOOSER_REQUEST = 4101;
 
     private WebView webView;
@@ -40,6 +45,7 @@ public class MainActivity extends Activity {
     private View nativeLoading;
     private View offlinePanel;
     private ValueCallback<Uri[]> fileCallback;
+    private Uri cameraOutputUri;
     private float touchStartY;
     private boolean firstPageLoaded = false;
     private long lastBackPressedAt = 0L;
@@ -61,7 +67,7 @@ public class MainActivity extends Activity {
         if (savedInstanceState == null) {
             if (isOnline()) {
                 showLoading(true);
-                webView.loadUrl(HOME_URL);
+                webView.loadUrl(getHomeUrl());
             } else {
                 showOffline();
             }
@@ -71,13 +77,17 @@ public class MainActivity extends Activity {
         }
     }
 
+    private String getHomeUrl() {
+        return HOME_BASE_URL + "?tager_app=android&app_version=" + BuildConfig.VERSION_NAME + "#home";
+    }
+
     private void configureWebView() {
         WebSettings s = webView.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setDatabaseEnabled(true);
         s.setAllowContentAccess(true);
-        s.setAllowFileAccess(true);
+        s.setAllowFileAccess(false);
         s.setLoadWithOverviewMode(true);
         s.setUseWideViewPort(true);
         s.setSupportZoom(false);
@@ -85,11 +95,11 @@ public class MainActivity extends Activity {
         s.setDisplayZoomControls(false);
         s.setTextZoom(100);
         s.setMediaPlaybackRequiresUserGesture(false);
-        s.setJavaScriptCanOpenWindowsAutomatically(true);
+        s.setJavaScriptCanOpenWindowsAutomatically(false);
         s.setSupportMultipleWindows(false);
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        s.setUserAgentString(s.getUserAgentString() + " TagerAndroidApp/1.1.0 Branding20260902");
+        s.setUserAgentString(s.getUserAgentString() + " TagerAndroidApp/" + BuildConfig.VERSION_NAME);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             s.setSafeBrowsingEnabled(true);
         }
@@ -183,8 +193,6 @@ public class MainActivity extends Activity {
                 "document.documentElement.classList.add('tager-native-android');" +
                 "document.body.classList.add('tager-native-android');" +
                 "document.documentElement.style.webkitTextSizeAdjust='100%';" +
-                "var n=document.querySelector('.tager-mobile-bottom-nav');" +
-                "if(n){n.style.display='grid';}" +
                 "})();";
         view.evaluateJavascript(appUiScript, null);
     }
@@ -234,12 +242,7 @@ public class MainActivity extends Activity {
             request.setAllowedOverMetered(true);
             request.setAllowedOverRoaming(false);
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
-            } else {
-                request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, fileName);
-            }
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
 
             DownloadManager dm = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
             dm.enqueue(request);
@@ -264,14 +267,36 @@ public class MainActivity extends Activity {
             fileIntent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
         }
 
-        Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        Intent cameraIntent = createFullResolutionCameraIntent();
         Intent chooser = new Intent(Intent.ACTION_CHOOSER);
         chooser.putExtra(Intent.EXTRA_INTENT, fileIntent);
         chooser.putExtra(Intent.EXTRA_TITLE, "اختر ملفًا أو التقط صورة");
-        if (cameraIntent.resolveActivity(getPackageManager()) != null) {
+        if (cameraIntent != null) {
             chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{cameraIntent});
         }
         startActivityForResult(chooser, FILE_CHOOSER_REQUEST);
+    }
+
+    private Intent createFullResolutionCameraIntent() {
+        Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (cameraIntent.resolveActivity(getPackageManager()) == null) return null;
+
+        try {
+            File cameraDir = new File(getCacheDir(), "camera");
+            if (!cameraDir.exists() && !cameraDir.mkdirs()) return null;
+            File imageFile = File.createTempFile("tager_camera_", ".jpg", cameraDir);
+            cameraOutputUri = FileProvider.getUriForFile(
+                    this,
+                    BuildConfig.APPLICATION_ID + ".fileprovider",
+                    imageFile
+            );
+            cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, cameraOutputUri);
+            cameraIntent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            return cameraIntent;
+        } catch (IOException e) {
+            cameraOutputUri = null;
+            return null;
+        }
     }
 
     @Override
@@ -280,25 +305,26 @@ public class MainActivity extends Activity {
         if (requestCode != FILE_CHOOSER_REQUEST || fileCallback == null) return;
 
         Uri[] result = null;
-        if (resultCode == RESULT_OK && data != null) {
-            ClipData clipData = data.getClipData();
-            if (clipData != null) {
-                result = new Uri[clipData.getItemCount()];
-                for (int i = 0; i < clipData.getItemCount(); i++) {
-                    result[i] = clipData.getItemAt(i).getUri();
+        if (resultCode == RESULT_OK) {
+            if (data != null) {
+                ClipData clipData = data.getClipData();
+                if (clipData != null) {
+                    result = new Uri[clipData.getItemCount()];
+                    for (int i = 0; i < clipData.getItemCount(); i++) {
+                        result[i] = clipData.getItemAt(i).getUri();
+                    }
+                } else if (data.getData() != null) {
+                    result = new Uri[]{data.getData()};
                 }
-            } else if (data.getData() != null) {
-                result = new Uri[]{data.getData()};
-            } else if (data.getExtras() != null && data.getExtras().get("data") instanceof Bitmap) {
-                Bitmap bitmap = (Bitmap) data.getExtras().get("data");
-                String inserted = MediaStore.Images.Media.insertImage(
-                        getContentResolver(), bitmap, "Tager_" + System.currentTimeMillis(), "Tager upload");
-                if (inserted != null) result = new Uri[]{Uri.parse(inserted)};
+            }
+            if (result == null && cameraOutputUri != null) {
+                result = new Uri[]{cameraOutputUri};
             }
         }
 
         fileCallback.onReceiveValue(result);
         fileCallback = null;
+        cameraOutputUri = null;
     }
 
     private void retryCurrentPage() {
@@ -310,7 +336,7 @@ public class MainActivity extends Activity {
         offlinePanel.setVisibility(View.GONE);
         showLoading(true);
         String currentUrl = webView.getUrl();
-        webView.loadUrl(currentUrl == null || currentUrl.startsWith("about:") ? HOME_URL : currentUrl);
+        webView.loadUrl(currentUrl == null || currentUrl.startsWith("about:") ? getHomeUrl() : currentUrl);
     }
 
     private boolean isOnline() {
