@@ -37,7 +37,7 @@ android {
     }
 }
 
-def verifyAndWriteWebp = { File source, File output, String expectedSha256, String label ->
+def verifyAndWriteWebp = { File source, File output, String expectedSha256, int expectedSize, String label ->
     if (!source.exists()) throw new GradleException("${label} source is missing")
     String encoded = source.getText('UTF-8').replaceAll('\\s+', '')
     byte[] decoded
@@ -45,6 +45,9 @@ def verifyAndWriteWebp = { File source, File output, String expectedSha256, Stri
         decoded = java.util.Base64.getDecoder().decode(encoded)
     } catch (Exception e) {
         throw new GradleException("${label} Base64 is invalid", e)
+    }
+    if (decoded.length != expectedSize) {
+        throw new GradleException("${label} size mismatch: ${decoded.length} != ${expectedSize}")
     }
     if (decoded.length < 12 || new String(decoded, 0, 4, 'US-ASCII') != 'RIFF' || new String(decoded, 8, 4, 'US-ASCII') != 'WEBP') {
         throw new GradleException("${label} is not a valid WebP container")
@@ -72,12 +75,14 @@ tasks.register('generateTagerBranding') {
             launcherSource,
             launcherOutputProvider.get().asFile,
             '09e4ebc534b98cc58286a776325b7ed98066ebe4f3afd048ecc0ca35f60db034',
+            10514,
             'Tager launcher'
         )
         verifyAndWriteWebp(
             splashSource,
             splashOutputProvider.get().asFile,
-            'd8cca699532c799b0ee042e979aabe7bbff72f94df8834665b970307a453fb3e',
+            'f6621bebc53674efe4efbb57a8c040ffe1a0ac8b9c7a12ee8c9c90ba9c8025a5',
+            11094,
             'Tager splash'
         )
     }
