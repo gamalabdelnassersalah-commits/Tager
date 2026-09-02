@@ -10,8 +10,8 @@ android {
         applicationId 'com.tager.marketplace'
         minSdk 23
         targetSdk 36
-        versionCode 3
-        versionName '1.1.1'
+        versionCode 4
+        versionName '1.2.0'
     }
 
     buildFeatures {
@@ -25,7 +25,12 @@ android {
         }
         release {
             minifyEnabled false
+            debuggable false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+}
+
+dependencies {
+    implementation 'androidx.core:core:1.16.0'
 }
