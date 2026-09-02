@@ -141,9 +141,7 @@ public class MainActivity extends Activity {
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 super.onReceivedError(view, request, error);
-                if (request != null && request.isForMainFrame()) {
-                    showOffline();
-                }
+                if (request != null && request.isForMainFrame()) showOffline();
             }
         });
 
@@ -188,13 +186,8 @@ public class MainActivity extends Activity {
     }
 
     private void injectAppPresentation(WebView view) {
-        String appUiScript =
-                "(function(){" +
-                "document.documentElement.classList.add('tager-native-android');" +
-                "document.body.classList.add('tager-native-android');" +
-                "document.documentElement.style.webkitTextSizeAdjust='100%';" +
-                "})();";
-        view.evaluateJavascript(appUiScript, null);
+        String script = "(function(){document.documentElement.classList.add('tager-native-android');document.body.classList.add('tager-native-android');document.documentElement.style.webkitTextSizeAdjust='100%';})();";
+        view.evaluateJavascript(script, null);
     }
 
     private boolean handleNavigation(Uri uri) {
@@ -203,22 +196,16 @@ public class MainActivity extends Activity {
         String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase();
 
         if (("http".equals(scheme) || "https".equals(scheme)) &&
-                ("tager-new.vercel.app".equals(host) || host.endsWith(".tager-new.vercel.app"))) {
-            return false;
-        }
+                ("tager-new.vercel.app".equals(host) || host.endsWith(".tager-new.vercel.app"))) return false;
 
         try {
             if ("intent".equals(scheme)) {
-                Intent intent = Intent.parseUri(uri.toString(), Intent.URI_INTENT_SCHEME);
-                startActivity(intent);
+                startActivity(Intent.parseUri(uri.toString(), Intent.URI_INTENT_SCHEME));
                 return true;
             }
             if ("tel".equals(scheme) || "mailto".equals(scheme) || "sms".equals(scheme) ||
-                    "whatsapp".equals(scheme) || "market".equals(scheme)) {
-                startActivity(new Intent(Intent.ACTION_VIEW, uri));
-                return true;
-            }
-            if ("http".equals(scheme) || "https".equals(scheme)) {
+                    "whatsapp".equals(scheme) || "market".equals(scheme) ||
+                    "http".equals(scheme) || "https".equals(scheme)) {
                 startActivity(new Intent(Intent.ACTION_VIEW, uri));
                 return true;
             }
@@ -242,7 +229,12 @@ public class MainActivity extends Activity {
             request.setAllowedOverMetered(true);
             request.setAllowedOverRoaming(false);
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
+            } else {
+                request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, fileName);
+            }
 
             DownloadManager dm = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
             dm.enqueue(request);
@@ -271,25 +263,18 @@ public class MainActivity extends Activity {
         Intent chooser = new Intent(Intent.ACTION_CHOOSER);
         chooser.putExtra(Intent.EXTRA_INTENT, fileIntent);
         chooser.putExtra(Intent.EXTRA_TITLE, "اختر ملفًا أو التقط صورة");
-        if (cameraIntent != null) {
-            chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{cameraIntent});
-        }
+        if (cameraIntent != null) chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{cameraIntent});
         startActivityForResult(chooser, FILE_CHOOSER_REQUEST);
     }
 
     private Intent createFullResolutionCameraIntent() {
         Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         if (cameraIntent.resolveActivity(getPackageManager()) == null) return null;
-
         try {
             File cameraDir = new File(getCacheDir(), "camera");
             if (!cameraDir.exists() && !cameraDir.mkdirs()) return null;
             File imageFile = File.createTempFile("tager_camera_", ".jpg", cameraDir);
-            cameraOutputUri = FileProvider.getUriForFile(
-                    this,
-                    BuildConfig.APPLICATION_ID + ".fileprovider",
-                    imageFile
-            );
+            cameraOutputUri = FileProvider.getUriForFile(this, BuildConfig.APPLICATION_ID + ".fileprovider", imageFile);
             cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, cameraOutputUri);
             cameraIntent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
             return cameraIntent;
@@ -310,16 +295,12 @@ public class MainActivity extends Activity {
                 ClipData clipData = data.getClipData();
                 if (clipData != null) {
                     result = new Uri[clipData.getItemCount()];
-                    for (int i = 0; i < clipData.getItemCount(); i++) {
-                        result[i] = clipData.getItemAt(i).getUri();
-                    }
+                    for (int i = 0; i < clipData.getItemCount(); i++) result[i] = clipData.getItemAt(i).getUri();
                 } else if (data.getData() != null) {
                     result = new Uri[]{data.getData()};
                 }
             }
-            if (result == null && cameraOutputUri != null) {
-                result = new Uri[]{cameraOutputUri};
-            }
+            if (result == null && cameraOutputUri != null) result = new Uri[]{cameraOutputUri};
         }
 
         fileCallback.onReceiveValue(result);
