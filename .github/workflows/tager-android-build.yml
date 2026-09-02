@@ -12,20 +12,24 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout Android app
         uses: actions/checkout@v4
 
-      - name: Install original Tager artwork
+      - name: Checkout stable Tager artwork source
+        uses: actions/checkout@v4
+        with:
+          repository: gamalabdelnassersalah-commits/tager-new
+          ref: main
+          path: .tager-artwork-source
+          persist-credentials: false
+
+      - name: Install and verify original Tager artwork
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p android-app/app/src/main/res/drawable-nodpi
-          curl --fail --location --retry 3 \
-            "https://raw.githubusercontent.com/gamalabdelnassersalah-commits/tager-new/main/tager-logo-full.png" \
-            -o android-app/app/src/main/res/drawable-nodpi/tager_brand_full.png
-          curl --fail --location --retry 3 \
-            "https://raw.githubusercontent.com/gamalabdelnassersalah-commits/tager-new/main/icon-512.png" \
-            -o android-app/app/src/main/res/drawable-nodpi/tager_launcher.png
+          cp .tager-artwork-source/tager-logo-full.png android-app/app/src/main/res/drawable-nodpi/tager_brand_full.png
+          cp .tager-artwork-source/icon-512.png android-app/app/src/main/res/drawable-nodpi/tager_launcher.png
           python3 - <<'PY'
           from pathlib import Path
           for name in ('tager_brand_full.png', 'tager_launcher.png'):
