@@ -7,7 +7,8 @@
     <WebView
         android:id="@+id/webView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:background="@color/white" />
 
     <ProgressBar
         android:id="@+id/progressBar"
@@ -18,4 +19,90 @@
         android:max="100"
         android:progressTint="@color/tager_orange"
         android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/nativeLoading"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="32dp"
+        android:background="@color/tager_mint">
+
+        <ImageView
+            android:layout_width="142dp"
+            android:layout_height="142dp"
+            android:src="@drawable/tager_icon"
+            android:contentDescription="Tager" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:text="Tager | تاجر"
+            android:textColor="@color/tager_teal_dark"
+            android:textStyle="bold"
+            android:textSize="27sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Trade • Supply • Connect"
+            android:textColor="@color/tager_teal"
+            android:textSize="14sp" />
+
+        <ProgressBar
+            style="?android:attr/progressBarStyle"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:layout_marginTop="28dp"
+            android:indeterminateTint="@color/tager_orange" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/offlinePanel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="34dp"
+        android:background="@color/white"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="112dp"
+            android:layout_height="112dp"
+            android:src="@drawable/tager_icon"
+            android:contentDescription="Tager" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="تعذر الاتصال"
+            android:textColor="@color/tager_teal_dark"
+            android:textStyle="bold"
+            android:textSize="25sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center"
+            android:text="تأكد من اتصال الإنترنت ثم أعد المحاولة"
+            android:textColor="@color/tager_text_muted"
+            android:textSize="16sp" />
+
+        <Button
+            android:id="@+id/retryButton"
+            android:layout_width="220dp"
+            android:layout_height="52dp"
+            android:layout_marginTop="26dp"
+            android:text="إعادة المحاولة"
+            android:textAllCaps="false"
+            android:textStyle="bold"
+            android:textColor="@color/white"
+            android:backgroundTint="@color/tager_teal" />
+    </LinearLayout>
 </FrameLayout>
