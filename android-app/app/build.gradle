@@ -2,6 +2,8 @@ plugins {
     id 'com.android.application'
 }
 
+def generatedBrandingResDir = layout.buildDirectory.dir('generated/tagerBranding/res')
+
 android {
     namespace 'com.tager.marketplace'
     compileSdk 36
@@ -10,12 +12,16 @@ android {
         applicationId 'com.tager.marketplace'
         minSdk 23
         targetSdk 36
-        versionCode 11
-        versionName '1.5.0'
+        versionCode 12
+        versionName '1.6.0'
     }
 
     buildFeatures {
         buildConfig true
+    }
+
+    sourceSets {
+        main.res.srcDir generatedBrandingResDir
     }
 
     buildTypes {
@@ -29,6 +35,44 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+}
+
+tasks.register('generateTagerBranding') {
+    def part1 = file('src/main/assets/branding/tager_launcher.b64.part01')
+    def part2 = file('src/main/assets/branding/tager_launcher.b64.part02')
+    def outputFileProvider = generatedBrandingResDir.map { it.file('drawable-nodpi/tager_launcher.png') }
+    inputs.files(part1, part2)
+    outputs.file(outputFileProvider)
+
+    doLast {
+        if (!part1.exists() || !part2.exists()) {
+            throw new GradleException('Tager launcher source parts are missing')
+        }
+        String encoded = (part1.getText('UTF-8') + part2.getText('UTF-8')).replaceAll('\\s+', '')
+        byte[] decoded
+        try {
+            decoded = java.util.Base64.getDecoder().decode(encoded)
+        } catch (Exception e) {
+            throw new GradleException('Tager launcher Base64 is invalid', e)
+        }
+        byte[] pngSignature = [(byte)0x89, (byte)0x50, (byte)0x4E, (byte)0x47, (byte)0x0D, (byte)0x0A, (byte)0x1A, (byte)0x0A] as byte[]
+        if (decoded.length < pngSignature.length) {
+            throw new GradleException('Tager launcher PNG is empty')
+        }
+        for (int i = 0; i < pngSignature.length; i++) {
+            if (decoded[i] != pngSignature[i]) {
+                throw new GradleException('Tager launcher output is not a valid PNG')
+            }
+        }
+        File out = outputFileProvider.get().asFile
+        out.parentFile.mkdirs()
+        out.bytes = decoded
+        println("Verified Tager launcher PNG generated: ${out.length()} bytes")
+    }
+}
+
+tasks.named('preBuild').configure {
+    dependsOn tasks.named('generateTagerBranding')
 }
 
 dependencies {
