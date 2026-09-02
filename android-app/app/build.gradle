@@ -1,0 +1,27 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.tager.marketplace'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.tager.marketplace'
+        minSdk 23
+        targetSdk 36
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix ''
+            debuggable true
+        }
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}

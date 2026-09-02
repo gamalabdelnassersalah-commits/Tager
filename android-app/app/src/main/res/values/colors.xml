@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="tager_teal">#005A4F</color>
+    <color name="tager_teal_dark">#063F35</color>
+    <color name="tager_orange">#F47414</color>
+    <color name="tager_mint">#EDF5F2</color>
+    <color name="white">#FFFFFF</color>
+</resources>
