@@ -19,6 +19,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -40,6 +41,7 @@ import java.io.IOException;
 public class MainActivity extends Activity {
     private static final String HOME_BASE_URL = "https://tager-new.vercel.app/";
     private static final int FILE_CHOOSER_REQUEST = 4101;
+    private static final String EXTRA_RECOVERY_PAGE = "tager_recovery_page";
 
     private WebView webView;
     private ProgressBar progressBar;
@@ -55,6 +57,9 @@ public class MainActivity extends Activity {
     private float touchStartY;
     private boolean firstPageLoaded = false;
     private long lastBackPressedAt = 0L;
+    private ConnectivityManager connectivityManager;
+    private ConnectivityManager.NetworkCallback networkCallback;
+    private boolean networkCallbackRegistered = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -75,12 +80,15 @@ public class MainActivity extends Activity {
         retryButton.setOnClickListener(v -> retryCurrentPage());
         configureNativeNavigation();
         configureWebView();
+        registerConnectivityWatcher();
 
         if (savedInstanceState == null) {
+            String requestedPage = sanitizePage(getIntent().getStringExtra(EXTRA_RECOVERY_PAGE));
             if (isOnline()) {
                 showLoading(true);
-                webView.loadUrl(getPageUrl("home"));
+                webView.loadUrl(getPageUrl(requestedPage));
             } else {
+                updateSelectedNavigation(requestedPage);
                 showOffline();
             }
         } else {
@@ -92,7 +100,22 @@ public class MainActivity extends Activity {
     }
 
     private String getPageUrl(String page) {
-        return HOME_BASE_URL + "?tager_app=android&app_version=" + BuildConfig.VERSION_NAME + "#" + page;
+        return HOME_BASE_URL + "?tager_app=android&app_version=" + BuildConfig.VERSION_NAME + "#" + sanitizePage(page);
+    }
+
+    private String sanitizePage(String page) {
+        if (page == null || page.isEmpty()) return "home";
+        if (!page.matches("[A-Za-z0-9_-]{1,64}")) return "home";
+        return page;
+    }
+
+    private String pageFromUrl(String url) {
+        if (url == null || url.isEmpty()) return "home";
+        try {
+            return sanitizePage(Uri.parse(url).getFragment());
+        } catch (Exception ignored) {
+            return "home";
+        }
     }
 
     private void configureNativeNavigation() {
@@ -105,9 +128,11 @@ public class MainActivity extends Activity {
     }
 
     private void navigateTo(String page) {
+        page = sanitizePage(page);
         offlinePanel.setVisibility(View.GONE);
         updateSelectedNavigation(page);
 
+        if (webView == null) return;
         String current = webView.getUrl();
         if (firstPageLoaded && isTagerUrl(current)) {
             String safePage = page.replace("'", "");
@@ -138,11 +163,7 @@ public class MainActivity extends Activity {
 
     private void syncNavigationFromUrl(String url) {
         if (url == null) return;
-        try {
-            String fragment = Uri.parse(url).getFragment();
-            if (fragment != null && !fragment.isEmpty()) updateSelectedNavigation(fragment);
-        } catch (Exception ignored) {
-        }
+        updateSelectedNavigation(pageFromUrl(url));
     }
 
     private void updateSelectedNavigation(String page) {
@@ -172,15 +193,15 @@ public class MainActivity extends Activity {
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         s.setUserAgentString(s.getUserAgentString() + " TagerAndroidApp/" + BuildConfig.VERSION_NAME);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            s.setOffscreenPreRaster(true);
-        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             s.setSafeBrowsingEnabled(true);
-            webView.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_BOUND, true);
+            webView.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_BOUND, false);
         }
 
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        webView.setVerticalScrollBarEnabled(false);
+        webView.setHorizontalScrollBarEnabled(false);
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
 
         CookieManager cookies = CookieManager.getInstance();
@@ -236,6 +257,17 @@ public class MainActivity extends Activity {
                 super.onReceivedError(view, request, error);
                 if (request != null && request.isForMainFrame()) showOffline();
             }
+
+            @Override
+            public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                String recoveryPage = pageFromUrl(view == null ? null : view.getUrl());
+                if (fileCallback != null) {
+                    fileCallback.onReceiveValue(null);
+                    fileCallback = null;
+                }
+                restartAfterRendererFailure(recoveryPage);
+                return true;
+            }
         });
 
         webView.setWebChromeClient(new WebChromeClient() {
@@ -277,6 +309,46 @@ public class MainActivity extends Activity {
             }
             return false;
         });
+    }
+
+    private void restartAfterRendererFailure(String page) {
+        Intent restart = new Intent(this, MainActivity.class);
+        restart.putExtra(EXTRA_RECOVERY_PAGE, sanitizePage(page));
+        restart.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(restart);
+        finish();
+    }
+
+    private void registerConnectivityWatcher() {
+        connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (connectivityManager == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return;
+
+        networkCallback = new ConnectivityManager.NetworkCallback() {
+            @Override
+            public void onAvailable(Network network) {
+                runOnUiThread(() -> {
+                    if (offlinePanel != null && offlinePanel.getVisibility() == View.VISIBLE && webView != null) {
+                        retryCurrentPage();
+                    }
+                });
+            }
+        };
+
+        try {
+            connectivityManager.registerDefaultNetworkCallback(networkCallback);
+            networkCallbackRegistered = true;
+        } catch (Exception ignored) {
+            networkCallbackRegistered = false;
+        }
+    }
+
+    private void unregisterConnectivityWatcher() {
+        if (!networkCallbackRegistered || connectivityManager == null || networkCallback == null) return;
+        try {
+            connectivityManager.unregisterNetworkCallback(networkCallback);
+        } catch (Exception ignored) {
+        }
+        networkCallbackRegistered = false;
     }
 
     private void injectAppPresentation(WebView view) {
@@ -413,6 +485,7 @@ public class MainActivity extends Activity {
             return;
         }
         offlinePanel.setVisibility(View.GONE);
+        if (webView == null) return;
         String currentUrl = webView.getUrl();
         if (currentUrl == null || currentUrl.startsWith("about:")) {
             showLoading(true);
@@ -436,18 +509,18 @@ public class MainActivity extends Activity {
     }
 
     private void showLoading(boolean show) {
-        nativeLoading.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (nativeLoading != null) nativeLoading.setVisibility(show ? View.VISIBLE : View.GONE);
     }
 
     private void showOffline() {
         showLoading(false);
-        progressBar.setVisibility(View.GONE);
-        offlinePanel.setVisibility(View.VISIBLE);
+        if (progressBar != null) progressBar.setVisibility(View.GONE);
+        if (offlinePanel != null) offlinePanel.setVisibility(View.VISIBLE);
     }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
-        webView.saveState(outState);
+        if (webView != null) webView.saveState(outState);
         super.onSaveInstanceState(outState);
     }
 
@@ -457,6 +530,9 @@ public class MainActivity extends Activity {
         if (webView != null) {
             webView.onResume();
             webView.resumeTimers();
+        }
+        if (offlinePanel != null && offlinePanel.getVisibility() == View.VISIBLE && isOnline()) {
+            retryCurrentPage();
         }
     }
 
@@ -471,11 +547,18 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        unregisterConnectivityWatcher();
+        if (fileCallback != null) {
+            fileCallback.onReceiveValue(null);
+            fileCallback = null;
+        }
         if (webView != null) {
-            webView.stopLoading();
-            webView.loadUrl("about:blank");
-            webView.removeAllViews();
-            webView.destroy();
+            try {
+                webView.stopLoading();
+                webView.removeAllViews();
+                webView.destroy();
+            } catch (Exception ignored) {
+            }
             webView = null;
         }
         super.onDestroy();
@@ -483,9 +566,9 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (offlinePanel.getVisibility() == View.VISIBLE) {
+        if (offlinePanel != null && offlinePanel.getVisibility() == View.VISIBLE) {
             offlinePanel.setVisibility(View.GONE);
-            if (webView.canGoBack()) webView.goBack();
+            if (webView != null && webView.canGoBack()) webView.goBack();
             return;
         }
         if (webView != null && webView.canGoBack()) {
