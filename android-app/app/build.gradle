@@ -81,7 +81,7 @@ tasks.register('generateTagerBranding') {
         verifyAndWriteWebp(
             splashSource,
             splashOutputProvider.get().asFile,
-            'f6621bebc53674efe4efbb57a8c040ffe1a0ac8b9c7a12ee8c9c90ba9c8025a5',
+            'd8cca699532c799b0ee042e979aabe7bbff72f94df8834665b970307a453fb3e',
             11118,
             'Tager splash'
         )
