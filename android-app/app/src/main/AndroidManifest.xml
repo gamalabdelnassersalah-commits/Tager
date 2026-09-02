@@ -9,8 +9,8 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:hardwareAccelerated="true"
         android:label="Tager | تاجر"
-        android:icon="@drawable/tager_icon"
-        android:roundIcon="@drawable/tager_icon"
+        android:icon="@drawable/tager_launcher"
+        android:roundIcon="@drawable/tager_launcher"
         android:theme="@style/Theme.Tager">
 
         <provider
@@ -35,21 +35,17 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="tager" />
             </intent-filter>
-
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="https"
-                    android:host="tager-new.vercel.app" />
+                <data android:scheme="https" android:host="tager-new.vercel.app" />
             </intent-filter>
         </activity>
 
