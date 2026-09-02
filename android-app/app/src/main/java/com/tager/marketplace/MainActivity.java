@@ -24,7 +24,13 @@ import android.widget.ProgressBar;
 import android.widget.Toast;
 
 public class MainActivity extends Activity {
-    private static final String HOME_URL = "https://tager-new.vercel.app/";
+    /*
+     * The app deliberately loads the production Tager UI with an app-version
+     * query. The production UI contains the supplied Tager artwork for Home,
+     * Products, Suppliers, Tracking and Cart. Bumping this value prevents an
+     * installed WebView from staying on an older pre-branding HTML shell.
+     */
+    private static final String HOME_URL = "https://tager-new.vercel.app/?tager_app=android&branding=20260902#home";
     private static final int FILE_CHOOSER_REQUEST = 4101;
 
     private WebView webView;
@@ -62,7 +68,8 @@ public class MainActivity extends Activity {
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setJavaScriptCanOpenWindowsAutomatically(true);
         s.setSupportMultipleWindows(false);
-        s.setUserAgentString(s.getUserAgentString() + " TagerApp/1.0");
+        s.setCacheMode(WebSettings.LOAD_DEFAULT);
+        s.setUserAgentString(s.getUserAgentString() + " TagerAndroidApp/1.1 Branding20260902");
 
         CookieManager cookies = CookieManager.getInstance();
         cookies.setAcceptCookie(true);
@@ -83,6 +90,17 @@ public class MainActivity extends Activity {
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 CookieManager.getInstance().flush();
+
+                // App-specific presentation: keep the supplied Tager mobile
+                // navigation artwork visible inside the Android application.
+                String appUiScript =
+                        "(function(){" +
+                        "document.documentElement.classList.add('tager-native-android');" +
+                        "document.body.classList.add('tager-native-android');" +
+                        "var n=document.querySelector('.tager-mobile-bottom-nav');" +
+                        "if(n){n.style.display='grid';}" +
+                        "})();";
+                view.evaluateJavascript(appUiScript, null);
             }
         });
 
