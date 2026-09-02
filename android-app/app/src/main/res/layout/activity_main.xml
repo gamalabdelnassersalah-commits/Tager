@@ -27,12 +27,14 @@
         android:orientation="vertical"
         android:gravity="center"
         android:padding="32dp"
-        android:background="@color/tager_mint">
+        android:background="@color/white">
 
         <ImageView
-            android:layout_width="142dp"
-            android:layout_height="142dp"
-            android:src="@drawable/tager_icon"
+            android:layout_width="196dp"
+            android:layout_height="196dp"
+            android:adjustViewBounds="true"
+            android:scaleType="fitCenter"
+            android:src="@drawable/tager_icon_original"
             android:contentDescription="Tager" />
 
         <TextView
@@ -71,9 +73,11 @@
         android:visibility="gone">
 
         <ImageView
-            android:layout_width="112dp"
-            android:layout_height="112dp"
-            android:src="@drawable/tager_icon"
+            android:layout_width="132dp"
+            android:layout_height="132dp"
+            android:adjustViewBounds="true"
+            android:scaleType="fitCenter"
+            android:src="@drawable/tager_icon_original"
             android:contentDescription="Tager" />
 
         <TextView

@@ -8,8 +8,8 @@
         android:allowBackup="true"
         android:usesCleartextTraffic="false"
         android:label="Tager | تاجر"
-        android:icon="@drawable/tager_icon"
-        android:roundIcon="@drawable/tager_icon"
+        android:icon="@drawable/tager_icon_original"
+        android:roundIcon="@drawable/tager_icon_original"
         android:theme="@style/Theme.Tager">
 
         <activity
@@ -23,8 +23,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Kept for source compatibility with older APK builds; the new app
-             opens the branded Tager interface directly. -->
         <activity
             android:name=".SplashActivity"
             android:exported="false"
