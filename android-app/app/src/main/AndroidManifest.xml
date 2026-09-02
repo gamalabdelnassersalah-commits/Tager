@@ -7,8 +7,8 @@
         android:allowBackup="false"
         android:usesCleartextTraffic="false"
         android:label="Tager | تاجر"
-        android:icon="@drawable/tager_icon_original"
-        android:roundIcon="@drawable/tager_icon_original"
+        android:icon="@drawable/tager_icon"
+        android:roundIcon="@drawable/tager_icon"
         android:theme="@style/Theme.Tager">
 
         <provider
