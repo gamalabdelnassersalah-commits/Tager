@@ -37,37 +37,49 @@ android {
     }
 }
 
+def verifyAndWriteWebp = { File source, File output, String expectedSha256, String label ->
+    if (!source.exists()) throw new GradleException("${label} source is missing")
+    String encoded = source.getText('UTF-8').replaceAll('\\s+', '')
+    byte[] decoded
+    try {
+        decoded = java.util.Base64.getDecoder().decode(encoded)
+    } catch (Exception e) {
+        throw new GradleException("${label} Base64 is invalid", e)
+    }
+    if (decoded.length < 12 || new String(decoded, 0, 4, 'US-ASCII') != 'RIFF' || new String(decoded, 8, 4, 'US-ASCII') != 'WEBP') {
+        throw new GradleException("${label} is not a valid WebP container")
+    }
+    def digest = java.security.MessageDigest.getInstance('SHA-256').digest(decoded)
+    String actualSha = digest.collect { String.format('%02x', it & 0xff) }.join()
+    if (!actualSha.equalsIgnoreCase(expectedSha256)) {
+        throw new GradleException("${label} SHA-256 mismatch: ${actualSha}")
+    }
+    output.parentFile.mkdirs()
+    output.bytes = decoded
+    println("Verified ${label}: ${output.length()} bytes, sha256=${actualSha}")
+}
+
 tasks.register('generateTagerBranding') {
-    def part1 = file('src/main/assets/branding/tager_launcher.b64.part01')
-    def part2 = file('src/main/assets/branding/tager_launcher.b64.part02')
-    def outputFileProvider = generatedBrandingResDir.map { it.file('drawable-nodpi/tager_launcher.png') }
-    inputs.files(part1, part2)
-    outputs.file(outputFileProvider)
+    def launcherSource = file('src/main/assets/branding/tager_launcher_valid.b64')
+    def splashSource = file('src/main/assets/branding/tager_splash_valid.b64')
+    def launcherOutputProvider = generatedBrandingResDir.map { it.file('drawable-nodpi/tager_launcher.webp') }
+    def splashOutputProvider = generatedBrandingResDir.map { it.file('drawable-nodpi/tager_splash.webp') }
+    inputs.files(launcherSource, splashSource)
+    outputs.files(launcherOutputProvider, splashOutputProvider)
 
     doLast {
-        if (!part1.exists() || !part2.exists()) {
-            throw new GradleException('Tager launcher source parts are missing')
-        }
-        String encoded = (part1.getText('UTF-8') + part2.getText('UTF-8')).replaceAll('\\s+', '')
-        byte[] decoded
-        try {
-            decoded = java.util.Base64.getDecoder().decode(encoded)
-        } catch (Exception e) {
-            throw new GradleException('Tager launcher Base64 is invalid', e)
-        }
-        byte[] pngSignature = [(byte)0x89, (byte)0x50, (byte)0x4E, (byte)0x47, (byte)0x0D, (byte)0x0A, (byte)0x1A, (byte)0x0A] as byte[]
-        if (decoded.length < pngSignature.length) {
-            throw new GradleException('Tager launcher PNG is empty')
-        }
-        for (int i = 0; i < pngSignature.length; i++) {
-            if (decoded[i] != pngSignature[i]) {
-                throw new GradleException('Tager launcher output is not a valid PNG')
-            }
-        }
-        File out = outputFileProvider.get().asFile
-        out.parentFile.mkdirs()
-        out.bytes = decoded
-        println("Verified Tager launcher PNG generated: ${out.length()} bytes")
+        verifyAndWriteWebp(
+            launcherSource,
+            launcherOutputProvider.get().asFile,
+            '09e4ebc534b98cc58286a776325b7ed98066ebe4f3afd048ecc0ca35f60db034',
+            'Tager launcher'
+        )
+        verifyAndWriteWebp(
+            splashSource,
+            splashOutputProvider.get().asFile,
+            'f6621bebc53674efe4efbb57a8c040ffe1a0ac8b9c7a12ee8c9c90ba9c8025a5',
+            'Tager splash'
+        )
     }
 }
 
