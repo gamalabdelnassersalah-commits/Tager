@@ -1,0 +1,2 @@
+Tager Android 1.6 asset injection audit branch marker.
+Original launcher icon and splash are injected as binary PNG resources and verified after build.
