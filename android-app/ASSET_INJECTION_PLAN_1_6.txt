@@ -1,0 +1,4 @@
+Tager Android 1.6 asset injection verification:
+- launcher source: original square Tager icon PNG
+- splash source: 1080x1920 high-resolution Tager splash PNG
+- binary resources must be present in APK and referenced by manifest/layout before merge
