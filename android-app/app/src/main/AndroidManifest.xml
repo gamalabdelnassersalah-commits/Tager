@@ -6,6 +6,7 @@
     <application
         android:allowBackup="false"
         android:usesCleartextTraffic="false"
+        android:hardwareAccelerated="true"
         android:label="Tager | تاجر"
         android:icon="@drawable/tager_icon"
         android:roundIcon="@drawable/tager_icon"
@@ -25,6 +26,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|keyboardHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
