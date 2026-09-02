@@ -16,6 +16,8 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.MediaStore;
 import android.view.MotionEvent;
 import android.view.View;
@@ -46,12 +48,16 @@ public class MainActivity extends Activity {
     private static final String EXTRA_RECOVERY_PAGE = "tager_recovery_page";
     private static final String PREFS_NAME = "tager_app_state";
     private static final String PREF_LAST_PAGE = "last_page";
+    private static final String PREF_LAST_GOOD_URL = "last_good_url";
     private static final long NAV_DEBOUNCE_MS = 260L;
+    private static final long SLOW_LOAD_WARNING_MS = 9000L;
+    private static final long CAMERA_CACHE_MAX_AGE_MS = 24L * 60L * 60L * 1000L;
 
     private WebView webView;
     private ProgressBar progressBar;
     private View nativeLoading;
     private View offlinePanel;
+    private TextView statusBanner;
     private TextView navHome;
     private TextView navProducts;
     private TextView navSuppliers;
@@ -70,6 +76,8 @@ public class MainActivity extends Activity {
     private boolean lastKnownOnline = false;
     private boolean lowRamDevice = false;
     private SharedPreferences preferences;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private Runnable slowLoadWarning;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -81,6 +89,7 @@ public class MainActivity extends Activity {
         progressBar = findViewById(R.id.progressBar);
         nativeLoading = findViewById(R.id.nativeLoading);
         offlinePanel = findViewById(R.id.offlinePanel);
+        statusBanner = findViewById(R.id.statusBanner);
         navHome = findViewById(R.id.navHome);
         navProducts = findViewById(R.id.navProducts);
         navSuppliers = findViewById(R.id.navSuppliers);
@@ -88,6 +97,7 @@ public class MainActivity extends Activity {
         navCart = findViewById(R.id.navCart);
         Button retryButton = findViewById(R.id.retryButton);
 
+        cleanupCameraCache();
         retryButton.setOnClickListener(v -> retryCurrentPage());
         configureNativeNavigation();
         configureWebView();
@@ -100,6 +110,7 @@ public class MainActivity extends Activity {
             showLoading(true);
             if (!lastKnownOnline) {
                 webView.getSettings().setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
+                showStatus("لا يوجد اتصال مؤكد — سيتم استخدام المحتوى المحفوظ إن توفر");
             }
             webView.loadUrl(getPageUrl(requestedPage));
         } else {
@@ -114,8 +125,7 @@ public class MainActivity extends Activity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        String requestedPage = resolveRequestedPage(intent);
-        navigateTo(requestedPage);
+        navigateTo(resolveRequestedPage(intent));
     }
 
     private String getPageUrl(String page) {
@@ -147,9 +157,7 @@ public class MainActivity extends Activity {
                 String scheme = data.getScheme() == null ? "" : data.getScheme().toLowerCase();
                 if ("tager".equals(scheme)) {
                     String host = data.getHost();
-                    if (host != null && !host.isEmpty() && !"open".equalsIgnoreCase(host)) {
-                        return sanitizePage(host);
-                    }
+                    if (host != null && !host.isEmpty() && !"open".equalsIgnoreCase(host)) return sanitizePage(host);
                     String lastPath = data.getLastPathSegment();
                     if (lastPath != null && !lastPath.isEmpty()) return sanitizePage(lastPath);
                 }
@@ -167,6 +175,12 @@ public class MainActivity extends Activity {
         if (preferences == null) return;
         String current = preferences.getString(PREF_LAST_PAGE, "home");
         if (!page.equals(current)) preferences.edit().putString(PREF_LAST_PAGE, page).apply();
+    }
+
+    private void rememberGoodUrl(String url) {
+        if (preferences == null || !isTagerUrl(url)) return;
+        String current = preferences.getString(PREF_LAST_GOOD_URL, "");
+        if (!url.equals(current)) preferences.edit().putString(PREF_LAST_GOOD_URL, url).apply();
     }
 
     private void configureNativeNavigation() {
@@ -201,13 +215,11 @@ public class MainActivity extends Activity {
 
         if (firstPageLoaded && isTagerUrl(currentUrl)) {
             String safePage = page.replace("'", "");
-            String js = "(function(){var p='" + safePage + "';if(location.hash!=='#'+p){location.hash=p;}else if(typeof window.go==='function'){window.go(p);}})();";
-            webView.evaluateJavascript(js, null);
+            webView.evaluateJavascript("(function(){var p='" + safePage + "';if(location.hash!=='#'+p){location.hash=p;}else if(typeof window.go==='function'){window.go(p);}})();", null);
             return;
         }
 
-        if (!isOnline()) webView.getSettings().setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
-        else webView.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
+        webView.getSettings().setCacheMode(isOnline() ? WebSettings.LOAD_DEFAULT : WebSettings.LOAD_CACHE_ELSE_NETWORK);
         showLoading(true);
         webView.loadUrl(getPageUrl(page));
     }
@@ -266,15 +278,10 @@ public class MainActivity extends Activity {
 
         ActivityManager activityManager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
         lowRamDevice = activityManager != null && activityManager.isLowRamDevice();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !lowRamDevice) {
-            s.setOffscreenPreRaster(true);
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !lowRamDevice) s.setOffscreenPreRaster(true);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             s.setSafeBrowsingEnabled(true);
-            webView.setRendererPriorityPolicy(
-                    lowRamDevice ? WebView.RENDERER_PRIORITY_WAIVED : WebView.RENDERER_PRIORITY_BOUND,
-                    lowRamDevice
-            );
+            webView.setRendererPriorityPolicy(lowRamDevice ? WebView.RENDERER_PRIORITY_WAIVED : WebView.RENDERER_PRIORITY_BOUND, lowRamDevice);
         }
 
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
@@ -303,6 +310,7 @@ public class MainActivity extends Activity {
                 super.onPageStarted(view, url, favicon);
                 if (offlinePanel != null) offlinePanel.setVisibility(View.GONE);
                 if (!firstPageLoaded) showLoading(true);
+                scheduleSlowLoadWarning();
             }
 
             @Override
@@ -310,6 +318,7 @@ public class MainActivity extends Activity {
                 super.onPageCommitVisible(view, url);
                 firstPageLoaded = true;
                 showLoading(false);
+                hideStatus();
                 if (offlinePanel != null) offlinePanel.setVisibility(View.GONE);
                 syncNavigationFromUrl(url);
             }
@@ -317,10 +326,12 @@ public class MainActivity extends Activity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
+                cancelSlowLoadWarning();
                 firstPageLoaded = true;
                 showLoading(false);
                 if (offlinePanel != null) offlinePanel.setVisibility(View.GONE);
                 if (isOnline()) view.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
+                rememberGoodUrl(url);
                 syncNavigationFromUrl(url);
                 injectAppPresentation(view);
             }
@@ -334,11 +345,16 @@ public class MainActivity extends Activity {
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 super.onReceivedError(view, request, error);
-                if (request != null && request.isForMainFrame()) showOffline();
+                if (request != null && request.isForMainFrame()) {
+                    cancelSlowLoadWarning();
+                    if (!isOnline()) showOffline();
+                    else showStatus("تعذر تحميل الصفحة. اضغط إعادة المحاولة إذا استمرت المشكلة");
+                }
             }
 
             @Override
             public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                cancelSlowLoadWarning();
                 String recoveryPage = pageFromUrl(view == null ? null : view.getUrl());
                 rememberPage(recoveryPage);
                 if (fileCallback != null) {
@@ -359,9 +375,7 @@ public class MainActivity extends Activity {
             }
 
             @Override
-            public boolean onShowFileChooser(WebView webView,
-                                             ValueCallback<Uri[]> filePathCallback,
-                                             FileChooserParams fileChooserParams) {
+            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
                 if (fileCallback != null) fileCallback.onReceiveValue(null);
                 fileCallback = filePathCallback;
                 openFileAndCameraChooser(fileChooserParams);
@@ -371,28 +385,51 @@ public class MainActivity extends Activity {
 
         webView.setDownloadListener(new DownloadListener() {
             @Override
-            public void onDownloadStart(String url, String userAgent, String contentDisposition,
-                                        String mimetype, long contentLength) {
+            public void onDownloadStart(String url, String userAgent, String contentDisposition, String mimetype, long contentLength) {
                 startDownload(url, userAgent, contentDisposition, mimetype);
             }
         });
 
         webView.setOnTouchListener((v, event) -> {
-            if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                touchStartY = event.getY();
-            } else if (event.getAction() == MotionEvent.ACTION_UP) {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) touchStartY = event.getY();
+            else if (event.getAction() == MotionEvent.ACTION_UP) {
                 float distance = event.getY() - touchStartY;
                 if (webView.getScrollY() == 0 && distance > 460) {
                     if (isOnline()) {
                         webView.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
                         webView.reload();
-                    } else {
-                        showOffline();
-                    }
+                    } else showOffline();
                 }
             }
             return false;
         });
+    }
+
+    private void scheduleSlowLoadWarning() {
+        cancelSlowLoadWarning();
+        slowLoadWarning = () -> {
+            if (webView != null && webView.getProgress() < 85) {
+                showStatus(isOnline() ? "التحميل أبطأ من المعتاد — جاري إكمال الصفحة" : "الاتصال غير مستقر — نحاول استخدام المحتوى المحفوظ");
+            }
+        };
+        mainHandler.postDelayed(slowLoadWarning, SLOW_LOAD_WARNING_MS);
+    }
+
+    private void cancelSlowLoadWarning() {
+        if (slowLoadWarning != null) {
+            mainHandler.removeCallbacks(slowLoadWarning);
+            slowLoadWarning = null;
+        }
+    }
+
+    private void showStatus(String message) {
+        if (statusBanner == null) return;
+        statusBanner.setText(message);
+        statusBanner.setVisibility(View.VISIBLE);
+    }
+
+    private void hideStatus() {
+        if (statusBanner != null) statusBanner.setVisibility(View.GONE);
     }
 
     private void restartAfterRendererFailure(String page) {
@@ -407,20 +444,9 @@ public class MainActivity extends Activity {
         if (connectivityManager == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return;
 
         networkCallback = new ConnectivityManager.NetworkCallback() {
-            @Override
-            public void onAvailable(Network network) {
-                handleConnectivityChanged();
-            }
-
-            @Override
-            public void onCapabilitiesChanged(Network network, NetworkCapabilities networkCapabilities) {
-                handleConnectivityChanged();
-            }
-
-            @Override
-            public void onLost(Network network) {
-                handleConnectivityChanged();
-            }
+            @Override public void onAvailable(Network network) { handleConnectivityChanged(); }
+            @Override public void onCapabilitiesChanged(Network network, NetworkCapabilities caps) { handleConnectivityChanged(); }
+            @Override public void onLost(Network network) { handleConnectivityChanged(); }
         };
 
         try {
@@ -437,24 +463,20 @@ public class MainActivity extends Activity {
             boolean restored = online && !lastKnownOnline;
             lastKnownOnline = online;
 
-            if (webView != null) {
-                webView.getSettings().setCacheMode(
-                        online ? WebSettings.LOAD_DEFAULT : WebSettings.LOAD_CACHE_ELSE_NETWORK
-                );
+            if (webView != null) webView.getSettings().setCacheMode(online ? WebSettings.LOAD_DEFAULT : WebSettings.LOAD_CACHE_ELSE_NETWORK);
+            if (!online) showStatus("الاتصال بالإنترنت غير متاح حاليًا");
+            else if (restored) {
+                showStatus("عاد الاتصال بالإنترنت");
+                mainHandler.postDelayed(this::hideStatus, 1300L);
             }
 
-            if (restored && offlinePanel != null && offlinePanel.getVisibility() == View.VISIBLE && webView != null) {
-                retryCurrentPage();
-            }
+            if (restored && offlinePanel != null && offlinePanel.getVisibility() == View.VISIBLE && webView != null) retryCurrentPage();
         });
     }
 
     private void unregisterConnectivityWatcher() {
         if (!networkCallbackRegistered || connectivityManager == null || networkCallback == null) return;
-        try {
-            connectivityManager.unregisterNetworkCallback(networkCallback);
-        } catch (Exception ignored) {
-        }
+        try { connectivityManager.unregisterNetworkCallback(networkCallback); } catch (Exception ignored) {}
         networkCallbackRegistered = false;
     }
 
@@ -485,27 +507,18 @@ public class MainActivity extends Activity {
                 parsedIntent.addCategory(Intent.CATEGORY_BROWSABLE);
                 parsedIntent.setComponent(null);
                 parsedIntent.setSelector(null);
-                if (parsedIntent.resolveActivity(getPackageManager()) != null) {
-                    startActivity(parsedIntent);
-                } else {
+                if (parsedIntent.resolveActivity(getPackageManager()) != null) startActivity(parsedIntent);
+                else {
                     String fallbackUrl = parsedIntent.getStringExtra("browser_fallback_url");
-                    if (fallbackUrl != null && !fallbackUrl.isEmpty()) {
-                        handleNavigation(Uri.parse(fallbackUrl));
-                    } else {
-                        Toast.makeText(this, "التطبيق المطلوب غير مثبت", Toast.LENGTH_SHORT).show();
-                    }
+                    if (fallbackUrl != null && !fallbackUrl.isEmpty()) handleNavigation(Uri.parse(fallbackUrl));
+                    else Toast.makeText(this, "التطبيق المطلوب غير مثبت", Toast.LENGTH_SHORT).show();
                 }
                 return true;
             }
-            if ("tel".equals(scheme) || "mailto".equals(scheme) || "sms".equals(scheme) ||
-                    "whatsapp".equals(scheme) || "market".equals(scheme) ||
-                    "http".equals(scheme) || "https".equals(scheme)) {
+            if ("tel".equals(scheme) || "mailto".equals(scheme) || "sms".equals(scheme) || "whatsapp".equals(scheme) || "market".equals(scheme) || "http".equals(scheme) || "https".equals(scheme)) {
                 Intent externalIntent = new Intent(Intent.ACTION_VIEW, uri);
-                if (externalIntent.resolveActivity(getPackageManager()) != null) {
-                    startActivity(externalIntent);
-                } else {
-                    Toast.makeText(this, "لا يوجد تطبيق لفتح الرابط", Toast.LENGTH_SHORT).show();
-                }
+                if (externalIntent.resolveActivity(getPackageManager()) != null) startActivity(externalIntent);
+                else Toast.makeText(this, "لا يوجد تطبيق لفتح الرابط", Toast.LENGTH_SHORT).show();
                 return true;
             }
         } catch (Exception ignored) {
@@ -535,24 +548,15 @@ public class MainActivity extends Activity {
             request.setAllowedOverMetered(true);
             request.setAllowedOverRoaming(false);
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
-            } else {
-                request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, fileName);
-            }
-
-            DownloadManager dm = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
-            dm.enqueue(request);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
+            else request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, fileName);
+            ((DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE)).enqueue(request);
             Toast.makeText(this, "بدأ تحميل " + fileName, Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
             try {
                 Intent externalIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                if (externalIntent.resolveActivity(getPackageManager()) != null) {
-                    startActivity(externalIntent);
-                } else {
-                    Toast.makeText(this, "تعذر تحميل الملف", Toast.LENGTH_SHORT).show();
-                }
+                if (externalIntent.resolveActivity(getPackageManager()) != null) startActivity(externalIntent);
+                else Toast.makeText(this, "تعذر تحميل الملف", Toast.LENGTH_SHORT).show();
             } catch (Exception ignored) {
                 Toast.makeText(this, "تعذر تحميل الملف", Toast.LENGTH_SHORT).show();
             }
@@ -595,6 +599,16 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void cleanupCameraCache() {
+        try {
+            File dir = new File(getCacheDir(), "camera");
+            File[] files = dir.listFiles();
+            if (files == null) return;
+            long cutoff = System.currentTimeMillis() - CAMERA_CACHE_MAX_AGE_MS;
+            for (File file : files) if (file.isFile() && file.lastModified() < cutoff) file.delete();
+        } catch (Exception ignored) {}
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -607,9 +621,7 @@ public class MainActivity extends Activity {
                 if (clipData != null) {
                     result = new Uri[clipData.getItemCount()];
                     for (int i = 0; i < clipData.getItemCount(); i++) result[i] = clipData.getItemAt(i).getUri();
-                } else if (data.getData() != null) {
-                    result = new Uri[]{data.getData()};
-                }
+                } else if (data.getData() != null) result = new Uri[]{data.getData()};
             }
             if (result == null && cameraOutputUri != null) result = new Uri[]{cameraOutputUri};
         }
@@ -626,6 +638,7 @@ public class MainActivity extends Activity {
             return;
         }
         lastKnownOnline = true;
+        hideStatus();
         if (offlinePanel != null) offlinePanel.setVisibility(View.GONE);
         if (webView == null) return;
         webView.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
@@ -634,9 +647,7 @@ public class MainActivity extends Activity {
             showLoading(true);
             String lastPage = preferences == null ? "home" : preferences.getString(PREF_LAST_PAGE, "home");
             webView.loadUrl(getPageUrl(lastPage));
-        } else {
-            webView.reload();
-        }
+        } else webView.reload();
     }
 
     private boolean isOnline() {
@@ -646,9 +657,7 @@ public class MainActivity extends Activity {
             Network network = cm.getActiveNetwork();
             if (network == null) return false;
             NetworkCapabilities caps = cm.getNetworkCapabilities(network);
-            return caps != null
-                    && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                    && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
+            return caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
         }
         NetworkInfo info = cm.getActiveNetworkInfo();
         return info != null && info.isConnected();
@@ -659,7 +668,9 @@ public class MainActivity extends Activity {
     }
 
     private void showOffline() {
+        cancelSlowLoadWarning();
         showLoading(false);
+        showStatus("أنت غير متصل بالإنترنت");
         if (progressBar != null) progressBar.setVisibility(View.GONE);
         if (offlinePanel != null) offlinePanel.setVisibility(View.VISIBLE);
     }
@@ -677,9 +688,7 @@ public class MainActivity extends Activity {
             webView.onResume();
             webView.resumeTimers();
         }
-        if (offlinePanel != null && offlinePanel.getVisibility() == View.VISIBLE && isOnline()) {
-            retryCurrentPage();
-        }
+        if (offlinePanel != null && offlinePanel.getVisibility() == View.VISIBLE && isOnline()) retryCurrentPage();
     }
 
     @Override
@@ -694,7 +703,17 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (webView == null) return;
+        if (level >= TRIM_MEMORY_RUNNING_LOW && webView.getUrl() != null) rememberGoodUrl(webView.getUrl());
+        if (level >= TRIM_MEMORY_UI_HIDDEN) webView.pauseTimers();
+    }
+
+    @Override
     protected void onDestroy() {
+        cancelSlowLoadWarning();
+        mainHandler.removeCallbacksAndMessages(null);
         unregisterConnectivityWatcher();
         if (fileCallback != null) {
             fileCallback.onReceiveValue(null);
@@ -705,8 +724,7 @@ public class MainActivity extends Activity {
                 webView.stopLoading();
                 webView.removeAllViews();
                 webView.destroy();
-            } catch (Exception ignored) {
-            }
+            } catch (Exception ignored) {}
             webView = null;
         }
         super.onDestroy();
@@ -716,6 +734,7 @@ public class MainActivity extends Activity {
     public void onBackPressed() {
         if (offlinePanel != null && offlinePanel.getVisibility() == View.VISIBLE) {
             offlinePanel.setVisibility(View.GONE);
+            hideStatus();
             if (webView != null && webView.canGoBack()) webView.goBack();
             return;
         }
@@ -729,9 +748,8 @@ public class MainActivity extends Activity {
             return;
         }
         long now = System.currentTimeMillis();
-        if (now - lastBackPressedAt < 1800) {
-            moveTaskToBack(true);
-        } else {
+        if (now - lastBackPressedAt < 1800) moveTaskToBack(true);
+        else {
             lastBackPressedAt = now;
             Toast.makeText(this, "اضغط رجوع مرة أخرى للخروج", Toast.LENGTH_SHORT).show();
         }
