@@ -1,4 +1,4 @@
-name: Build Tager Android 1.4.2
+name: Build Tager Android 1.5.0
 
 on:
   workflow_dispatch:
@@ -38,19 +38,19 @@ jobs:
 
       - name: Prepare outputs
         run: |
-          cp android-app/app/build/outputs/apk/debug/app-debug.apk Tager-v1.4.2.apk
-          cp android-app/app/build/outputs/bundle/release/app-release.aab Tager-v1.4.2-unsigned.aab
+          cp android-app/app/build/outputs/apk/debug/app-debug.apk Tager-v1.5.0.apk
+          cp android-app/app/build/outputs/bundle/release/app-release.aab Tager-v1.5.0-unsigned.aab
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Tager-v1.4.2-APK
-          path: Tager-v1.4.2.apk
+          name: Tager-v1.5.0-APK
+          path: Tager-v1.5.0.apk
           retention-days: 30
 
       - name: Upload unsigned AAB
         uses: actions/upload-artifact@v4
         with:
-          name: Tager-v1.4.2-unsigned-AAB
-          path: Tager-v1.4.2-unsigned.aab
+          name: Tager-v1.5.0-unsigned-AAB
+          path: Tager-v1.5.0-unsigned.aab
           retention-days: 30
