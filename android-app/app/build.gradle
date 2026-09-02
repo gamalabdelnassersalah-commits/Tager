@@ -82,7 +82,7 @@ tasks.register('generateTagerBranding') {
             splashSource,
             splashOutputProvider.get().asFile,
             'f6621bebc53674efe4efbb57a8c040ffe1a0ac8b9c7a12ee8c9c90ba9c8025a5',
-            11094,
+            11118,
             'Tager splash'
         )
     }
