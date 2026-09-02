@@ -5,6 +5,21 @@
     android:orientation="vertical"
     android:background="@color/white">
 
+    <TextView
+        android:id="@+id/statusBanner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="10dp"
+        android:layout_marginTop="6dp"
+        android:gravity="center"
+        android:background="@drawable/status_banner_bg"
+        android:text="جاري الاتصال..."
+        android:textColor="@color/tager_teal_dark"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -120,74 +135,10 @@
         android:background="@color/white"
         android:elevation="12dp">
 
-        <TextView
-            android:id="@+id/navHome"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:background="@drawable/nav_item_bg"
-            android:text="⌂\nالرئيسية"
-            android:textColor="@color/tager_teal_dark"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:clickable="true"
-            android:focusable="true" />
-
-        <TextView
-            android:id="@+id/navProducts"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:background="@drawable/nav_item_bg"
-            android:text="▣\nالمنتجات"
-            android:textColor="@color/tager_teal_dark"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:clickable="true"
-            android:focusable="true" />
-
-        <TextView
-            android:id="@+id/navSuppliers"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:background="@drawable/nav_item_bg"
-            android:text="▤\nالموردون"
-            android:textColor="@color/tager_teal_dark"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:clickable="true"
-            android:focusable="true" />
-
-        <TextView
-            android:id="@+id/navTrack"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:background="@drawable/nav_item_bg"
-            android:text="⌖\nالتتبع"
-            android:textColor="@color/tager_teal_dark"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:clickable="true"
-            android:focusable="true" />
-
-        <TextView
-            android:id="@+id/navCart"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:background="@drawable/nav_item_bg"
-            android:text="🛒\nالسلة"
-            android:textColor="@color/tager_teal_dark"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:clickable="true"
-            android:focusable="true" />
+        <TextView android:id="@+id/navHome" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="center" android:background="@drawable/nav_item_bg" android:text="⌂\nالرئيسية" android:textColor="@color/tager_teal_dark" android:textSize="12sp" android:textStyle="bold" android:clickable="true" android:focusable="true" />
+        <TextView android:id="@+id/navProducts" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="center" android:background="@drawable/nav_item_bg" android:text="▣\nالمنتجات" android:textColor="@color/tager_teal_dark" android:textSize="12sp" android:textStyle="bold" android:clickable="true" android:focusable="true" />
+        <TextView android:id="@+id/navSuppliers" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="center" android:background="@drawable/nav_item_bg" android:text="▤\nالموردون" android:textColor="@color/tager_teal_dark" android:textSize="12sp" android:textStyle="bold" android:clickable="true" android:focusable="true" />
+        <TextView android:id="@+id/navTrack" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="center" android:background="@drawable/nav_item_bg" android:text="⌖\nالتتبع" android:textColor="@color/tager_teal_dark" android:textSize="12sp" android:textStyle="bold" android:clickable="true" android:focusable="true" />
+        <TextView android:id="@+id/navCart" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="center" android:background="@drawable/nav_item_bg" android:text="🛒\nالسلة" android:textColor="@color/tager_teal_dark" android:textSize="12sp" android:textStyle="bold" android:clickable="true" android:focusable="true" />
     </LinearLayout>
 </LinearLayout>
