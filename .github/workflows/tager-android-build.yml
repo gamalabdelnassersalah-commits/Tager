@@ -1,4 +1,4 @@
-name: Build Tager Android APK
+name: Build Tager Android
 
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -32,16 +32,25 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      - name: Build installable APK
+      - name: Build APK and AAB
         working-directory: android-app
-        run: gradle --no-daemon :app:assembleDebug
+        run: gradle --no-daemon :app:assembleDebug :app:bundleRelease
 
-      - name: Rename APK
-        run: cp android-app/app/build/outputs/apk/debug/app-debug.apk Tager.apk
+      - name: Prepare outputs
+        run: |
+          cp android-app/app/build/outputs/apk/debug/app-debug.apk Tager-v1.1.1.apk
+          cp android-app/app/build/outputs/bundle/release/app-release.aab Tager-v1.1.1-unsigned.aab
 
-      - name: Upload Tager APK
+      - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: Tager-APK
-          path: Tager.apk
+          name: Tager-APK-v1.1.1
+          path: Tager-v1.1.1.apk
+          retention-days: 30
+
+      - name: Upload Google Play AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tager-AAB-v1.1.1-unsigned
+          path: Tager-v1.1.1-unsigned.aab
           retention-days: 30
