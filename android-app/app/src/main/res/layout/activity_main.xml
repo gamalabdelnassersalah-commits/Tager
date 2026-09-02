@@ -132,8 +132,7 @@
             android:textSize="12sp"
             android:textStyle="bold"
             android:clickable="true"
-            android:focusable="true"
-            android:selected="true" />
+            android:focusable="true" />
 
         <TextView
             android:id="@+id/navProducts"
