@@ -13,8 +13,8 @@ android {
         applicationId 'com.tager.marketplace'
         minSdk 23
         targetSdk 36
-        versionCode 14
-        versionName '1.8.0'
+        versionCode 15
+        versionName '1.9.0'
     }
 
     buildFeatures {
@@ -26,6 +26,16 @@ android {
         checkReleaseBuilds true
         warningsAsErrors false
         disable 'ObsoleteSdkInt'
+    }
+
+    packaging {
+        resources {
+            excludes += [
+                'META-INF/DEPENDENCIES',
+                'META-INF/LICENSE*',
+                'META-INF/NOTICE*'
+            ]
+        }
     }
 
     buildTypes {
