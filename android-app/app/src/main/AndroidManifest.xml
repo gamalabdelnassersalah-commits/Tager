@@ -29,7 +29,7 @@
             android:launchMode="singleTask"
             android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize"
-            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
             android:theme="@style/Theme.Tager.Starting">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -43,13 +43,14 @@
                 <data android:scheme="tager" />
             </intent-filter>
 
-            <intent-filter>
+            <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:scheme="https"
-                    android:host="tager-new.vercel.app" />
+                    android:host="tager-new.vercel.app"
+                    android:pathPrefix="/" />
             </intent-filter>
         </activity>
 
