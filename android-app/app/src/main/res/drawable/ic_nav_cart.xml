@@ -1,6 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:width="34dp" android:height="34dp" android:gravity="center">
-        <bitmap android:src="@drawable/tager_nav_cart" android:gravity="fill" />
-    </item>
-</layer-list>
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FF005A4F" android:pathData="M3,4h2l2.2,10.2A2,2 0,0 0,9.2 16H18a2,2 0,0 0,1.9 -1.4L22,8H7.1L6.5,5H3zM10,18a2,2 0,1 0,0 4a2,2 0,0 0,0 -4zM18,18a2,2 0,1 0,0 4a2,2 0,0 0,0 -4z" />
+</vector>
