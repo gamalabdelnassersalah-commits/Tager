@@ -90,7 +90,7 @@ def generateVerifiedBranding = tasks.register('generateVerifiedBranding') {
             file("$brandingDir/splash_q50.part1.b64"),
             file("$brandingDir/splash_q50.part2.b64"),
             file("$brandingDir/splash_q50.part3.b64")
-        ], new File(outputDir, 'tager_splash.webp'), '14eb5d0aa693c1fc67f7d06e41ebfd7960f49c5cfd32ae47b493876b9a00a45b')
+        ], new File(outputDir, 'tager_splash.webp'), '8dc49f9cc334dcc8b25c8a4f263fc9f33fce742a314940350b1f6bd56860bee5')
     }
 }
 
