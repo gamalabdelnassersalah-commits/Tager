@@ -110,6 +110,23 @@ jobs:
             exit 1
           fi
 
+      - name: Verify native refresh production behavior
+        run: |
+          BUILD=android-app/app/build.gradle
+          LAYOUT=android-app/app/src/main/res/layout/activity_main.xml
+          REFRESH=android-app/app/src/main/java/com/tager/marketplace/TagerSwipeRefreshLayout.java
+          grep -q "androidx.swiperefreshlayout:swiperefreshlayout:1.2.0" "$BUILD"
+          grep -q 'com.tager.marketplace.TagerSwipeRefreshLayout' "$LAYOUT"
+          grep -q 'android:id="@+id/swipeRefresh"' "$LAYOUT"
+          grep -q 'MIN_INDICATOR_MS' "$REFRESH"
+          grep -q 'MIN_REFRESH_INTERVAL_MS' "$REFRESH"
+          grep -q 'REFRESH_TIMEOUT_MS' "$REFRESH"
+          grep -q 'NET_CAPABILITY_VALIDATED' "$REFRESH"
+          grep -q 'finishRefresh()' "$REFRESH"
+          grep -q 'onDetachedFromWindow' "$REFRESH"
+          grep -q 'setDistanceToTriggerSync' "$REFRESH"
+          grep -q 'setSlingshotDistance' "$REFRESH"
+
       - name: Verify accessibility and touch targets
         run: |
           LAYOUT=android-app/app/src/main/res/layout/activity_main.xml
