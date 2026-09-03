@@ -90,7 +90,12 @@ jobs:
           grep -q 'camera.setClipData' "$SRC"
           grep -q 'grantUriPermission' "$SRC"
           grep -q 'releaseCameraUriPermissions' "$SRC"
+          grep -q 'tryStartFileChooser' "$SRC"
+          grep -q 'cancelFileChooser' "$SRC"
           grep -q 'onPageCommitVisible' "$SRC"
+          grep -q 'restoreLastGoodPage' "$SRC"
+          grep -q 'shouldUseOffscreenPreRaster' "$SRC"
+          grep -q 'setOffscreenPreRaster(false)' "$SRC"
           grep -q 'nativeBottomNav.setPadding' "$SRC"
           grep -q 'fontScale' "$SRC"
           grep -q 'android:id="@+id/nativeBottomNav"' "$LAYOUT"
@@ -98,6 +103,10 @@ jobs:
           grep -A5 'android:id="@+id/nativeBottomNav"' "$LAYOUT" | grep -q 'android:minHeight="72dp"'
           if grep -q 'newProgress >= 60.*showLoading(false)' "$SRC"; then
             echo 'Early splash dismissal regression detected' >&2
+            exit 1
+          fi
+          if grep -q 'clearCache(true)' "$SRC"; then
+            echo 'Aggressive WebView cache clearing regression detected' >&2
             exit 1
           fi
 
