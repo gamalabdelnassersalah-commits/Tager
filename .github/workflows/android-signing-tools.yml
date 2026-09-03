@@ -1,0 +1,35 @@
+name: Export Android Signing Tools
+
+on:
+  push:
+    branches: [ android-v1.9-production-hardening ]
+    paths:
+      - '.github/workflows/android-signing-tools.yml'
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install build tools 35
+        run: sdkmanager "build-tools;35.0.0"
+
+      - name: Package signing tools
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          TOOLS="$SDK_ROOT/build-tools/35.0.0"
+          mkdir -p signing-tools/lib
+          cp "$TOOLS/apksigner" signing-tools/
+          cp "$TOOLS/lib/apksigner.jar" signing-tools/lib/
+          cp "$TOOLS/zipalign" signing-tools/
+          chmod +x signing-tools/apksigner signing-tools/zipalign
+
+      - name: Upload signing tools
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-build-tools-35-signing
+          path: signing-tools
+          retention-days: 1
