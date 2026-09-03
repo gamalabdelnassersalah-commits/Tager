@@ -55,10 +55,31 @@ jobs:
             echo 'Predictive back is disabled' >&2
             exit 1
           fi
+          if ! grep -R 'android:enableOnBackInvokedCallback="true"' "$MANIFEST_DIR" >/dev/null 2>&1; then
+            echo 'Predictive back is not explicitly enabled' >&2
+            exit 1
+          fi
+          if ! grep -R 'android:resizeableActivity="true"' "$MANIFEST_DIR" >/dev/null 2>&1; then
+            echo 'Resizable activity support missing' >&2
+            exit 1
+          fi
           if ! grep -R 'com.tager.marketplace.TagerActivity' "$MANIFEST_DIR" >/dev/null 2>&1; then
             echo 'Modern TagerActivity launcher missing' >&2
             exit 1
           fi
+
+      - name: Verify camera and package visibility
+        run: |
+          MANIFEST=android-app/app/src/main/AndroidManifest.xml
+          grep -q 'android.hardware.camera.any' "$MANIFEST"
+          grep -A2 'android.hardware.camera.any' "$MANIFEST" | grep -q 'android:required="false"'
+          grep -q 'android.media.action.IMAGE_CAPTURE' "$MANIFEST"
+          grep -q 'android:scheme="tel"' "$MANIFEST"
+          grep -q 'android:scheme="mailto"' "$MANIFEST"
+          grep -q 'android:scheme="sms"' "$MANIFEST"
+          grep -q 'android:scheme="market"' "$MANIFEST"
+          grep -q 'android:scheme="http"' "$MANIFEST"
+          grep -q 'android:scheme="https"' "$MANIFEST"
 
       - name: Verify runtime reliability hardening
         run: |
