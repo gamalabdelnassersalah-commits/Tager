@@ -22,7 +22,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.provider.MediaStore;
 import android.view.HapticFeedbackConstants;
-import android.view.MotionEvent;
 import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.RenderProcessGoneDetail;
@@ -79,6 +78,7 @@ public class TagerActivity extends Activity {
     private static final long CAMERA_CACHE_MAX_AGE_MS = 24L * 60L * 60L * 1000L;
 
     private WebView webView;
+    private TagerSwipeRefreshLayout swipeRefresh;
     private ProgressBar progressBar;
     private View nativeLoading;
     private View offlinePanel;
@@ -97,7 +97,6 @@ public class TagerActivity extends Activity {
     private OnBackInvokedCallback backInvokedCallback;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private Runnable slowLoadWarning;
-    private float touchStartY;
     private boolean firstPageLoaded;
     private boolean mainFrameLoadFailed;
     private boolean networkCallbackRegistered;
@@ -128,6 +127,7 @@ public class TagerActivity extends Activity {
             firstPageLoaded = webView.getUrl() != null;
             mainFrameLoadFailed = false;
             showLoading(false);
+            finishNativeRefresh();
             if (isTagerUrl(webView.getUrl())) syncNavigationFromUrl(webView.getUrl());
             return;
         }
@@ -144,6 +144,7 @@ public class TagerActivity extends Activity {
 
     private void bindViews() {
         webView = findViewById(R.id.webView);
+        swipeRefresh = findViewById(R.id.swipeRefresh);
         progressBar = findViewById(R.id.progressBar);
         nativeLoading = findViewById(R.id.nativeLoading);
         offlinePanel = findViewById(R.id.offlinePanel);
@@ -434,6 +435,7 @@ public class TagerActivity extends Activity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 cancelSlowLoadWarning();
+                finishNativeRefresh();
                 if (mainFrameLoadFailed) {
                     showLoading(false);
                     return;
@@ -458,6 +460,7 @@ public class TagerActivity extends Activity {
                 if (request != null && request.isForMainFrame()) {
                     mainFrameLoadFailed = true;
                     cancelSlowLoadWarning();
+                    finishNativeRefresh();
                     showLoading(false);
                     if (!isOnline()) showOffline();
                     else showStatus("تعذر تحميل الصفحة — اضغط هنا لإعادة المحاولة");
@@ -469,6 +472,7 @@ public class TagerActivity extends Activity {
                 if (request != null && request.isForMainFrame() && errorResponse != null && errorResponse.getStatusCode() >= 400) {
                     mainFrameLoadFailed = true;
                     cancelSlowLoadWarning();
+                    finishNativeRefresh();
                     showLoading(false);
                     showStatus("الخادم أعاد خطأ " + errorResponse.getStatusCode() + " — اضغط لإعادة المحاولة");
                 }
@@ -479,6 +483,7 @@ public class TagerActivity extends Activity {
                 mainFrameLoadFailed = true;
                 handler.cancel();
                 cancelSlowLoadWarning();
+                finishNativeRefresh();
                 showLoading(false);
                 showStatus("تعذر التحقق من أمان الاتصال — لم يتم فتح الصفحة");
             }
@@ -487,6 +492,7 @@ public class TagerActivity extends Activity {
             public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
                 mainFrameLoadFailed = true;
                 cancelSlowLoadWarning();
+                finishNativeRefresh();
                 String page = pageFromUrl(view == null ? null : view.getUrl());
                 cancelFileChooser(null);
                 if (view != null) {
@@ -524,22 +530,10 @@ public class TagerActivity extends Activity {
 
         webView.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) ->
                 startDownload(url, userAgent, contentDisposition, mimeType));
+    }
 
-        webView.setOnTouchListener((v, event) -> {
-            if (event.getAction() == MotionEvent.ACTION_DOWN) touchStartY = event.getY();
-            if (event.getAction() == MotionEvent.ACTION_UP) {
-                float distance = event.getY() - touchStartY;
-                if (webView.getScrollY() == 0 && distance > 480) {
-                    if (isOnline()) {
-                        webView.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
-                        webView.reload();
-                    } else {
-                        showOffline();
-                    }
-                }
-            }
-            return false;
-        });
+    private void finishNativeRefresh() {
+        if (swipeRefresh != null) swipeRefresh.finishRefresh();
     }
 
     private void scheduleSlowLoadWarning() {
@@ -618,6 +612,7 @@ public class TagerActivity extends Activity {
                         online ? WebSettings.LOAD_DEFAULT : WebSettings.LOAD_CACHE_ELSE_NETWORK);
             }
             if (!online) {
+                finishNativeRefresh();
                 showStatus("الاتصال بالإنترنت غير متاح حاليًا");
             } else if (restored) {
                 showStatus("عاد الاتصال بالإنترنت");
@@ -1000,6 +995,7 @@ public class TagerActivity extends Activity {
 
     private void showOffline() {
         cancelSlowLoadWarning();
+        finishNativeRefresh();
         mainFrameLoadFailed = true;
         showLoading(false);
         showStatus("أنت غير متصل بالإنترنت");
@@ -1068,6 +1064,7 @@ public class TagerActivity extends Activity {
             getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backInvokedCallback);
             backInvokedCallback = null;
         }
+        finishNativeRefresh();
         cancelFileChooser(null);
         if (webView != null) {
             try {
@@ -1078,6 +1075,7 @@ public class TagerActivity extends Activity {
             }
             webView = null;
         }
+        swipeRefresh = null;
         super.onDestroy();
     }
 
