@@ -1,3 +1,6 @@
+import java.security.MessageDigest
+import java.util.Base64
+
 plugins {
     id 'com.android.application'
 }
@@ -18,9 +21,14 @@ android {
         buildConfig true
     }
 
+    sourceSets {
+        main {
+            res.srcDir "$buildDir/generated/tagerBranding/res"
+        }
+    }
+
     buildTypes {
         debug {
-            applicationIdSuffix ''
             debuggable true
         }
         release {
@@ -33,4 +41,59 @@ android {
 
 dependencies {
     implementation 'androidx.core:core:1.16.0'
+}
+
+static String sha256(File file) {
+    MessageDigest digest = MessageDigest.getInstance('SHA-256')
+    file.withInputStream { input ->
+        byte[] buffer = new byte[8192]
+        int read
+        while ((read = input.read(buffer)) > 0) digest.update(buffer, 0, read)
+    }
+    return digest.digest().collect { String.format('%02x', it) }.join()
+}
+
+def decodeParts = { List<File> parts, File output, String expectedSha ->
+    String encoded = parts.collect { it.getText('UTF-8').replaceAll('\\s+', '') }.join('')
+    byte[] bytes = Base64.decoder.decode(encoded)
+    output.parentFile.mkdirs()
+    output.bytes = bytes
+    String actual = sha256(output)
+    if (actual != expectedSha) {
+        throw new GradleException("Branding SHA mismatch for ${output.name}: ${actual}")
+    }
+    if (bytes.length < 12 || new String(bytes, 0, 4, 'US-ASCII') != 'RIFF' || new String(bytes, 8, 4, 'US-ASCII') != 'WEBP') {
+        throw new GradleException("Invalid WebP branding file: ${output.name}")
+    }
+}
+
+def generateVerifiedBranding = tasks.register('generateVerifiedBranding') {
+    def brandingDir = file("$rootDir/branding")
+    def outputDir = file("$buildDir/generated/tagerBranding/res/drawable-nodpi")
+    inputs.files(
+        file("$brandingDir/icon_q75.part1.b64"),
+        file("$brandingDir/icon_q75.part2.b64"),
+        file("$brandingDir/icon_q75.part3.b64"),
+        file("$brandingDir/splash_q50.part1.b64"),
+        file("$brandingDir/splash_q50.part2.b64"),
+        file("$brandingDir/splash_q50.part3.b64")
+    )
+    outputs.dir(outputDir)
+    doLast {
+        decodeParts([
+            file("$brandingDir/icon_q75.part1.b64"),
+            file("$brandingDir/icon_q75.part2.b64"),
+            file("$brandingDir/icon_q75.part3.b64")
+        ], new File(outputDir, 'tager_launcher_verified.webp'), '86bd15d83d8f4f4642c94d62a4876b0a265b9fbc60462482f1cdda2768e4e4d9')
+
+        decodeParts([
+            file("$brandingDir/splash_q50.part1.b64"),
+            file("$brandingDir/splash_q50.part2.b64"),
+            file("$brandingDir/splash_q50.part3.b64")
+        ], new File(outputDir, 'tager_splash_verified.webp'), '14eb5d0aa693c1fc67f7d06e41ebfd7960f49c5cfd32ae47b493876b9a00a45b')
+    }
+}
+
+tasks.named('preBuild').configure {
+    dependsOn generateVerifiedBranding
 }
