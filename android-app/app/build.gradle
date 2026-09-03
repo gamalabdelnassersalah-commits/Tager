@@ -21,12 +21,6 @@ android {
         buildConfig true
     }
 
-    sourceSets {
-        main {
-            res.srcDir "$buildDir/generated/tagerBranding/res"
-        }
-    }
-
     buildTypes {
         debug {
             debuggable true
@@ -69,7 +63,7 @@ def decodeParts = { List<File> parts, File output, String expectedSha ->
 
 def generateVerifiedBranding = tasks.register('generateVerifiedBranding') {
     def brandingDir = file("$rootDir/branding")
-    def outputDir = file("$buildDir/generated/tagerBranding/res/drawable-nodpi")
+    def outputDir = file("$buildDir/generated/tagerBranding/verified")
     inputs.files(
         file("$brandingDir/icon_q75.part1.b64"),
         file("$brandingDir/icon_q75.part2.b64"),
