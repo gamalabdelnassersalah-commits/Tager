@@ -24,6 +24,7 @@ import android.provider.MediaStore;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.webkit.CookieManager;
+import android.webkit.PermissionRequest;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.SslErrorHandler;
 import android.webkit.URLUtil;
@@ -42,6 +43,7 @@ import android.widget.Toast;
 import android.window.OnBackInvokedCallback;
 import android.window.OnBackInvokedDispatcher;
 
+import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.core.content.FileProvider;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -514,8 +516,11 @@ public class TagerActivity extends Activity {
             public void onProgressChanged(WebView view, int newProgress) {
                 progressBar.setProgress(newProgress);
                 progressBar.setVisibility(newProgress >= 100 ? View.GONE : View.VISIBLE);
-                // Do not hide the native splash based on an arbitrary percentage.
-                // It is dismissed only when WebView commits visible content.
+            }
+
+            @Override
+            public void onPermissionRequest(PermissionRequest request) {
+                if (request != null) request.deny();
             }
 
             @Override
@@ -680,13 +685,15 @@ public class TagerActivity extends Activity {
                 }
                 return true;
             }
+            if ("http".equals(scheme) || "https".equals(scheme)) {
+                openExternalWebLink(uri);
+                return true;
+            }
             if ("tel".equals(scheme)
                     || "mailto".equals(scheme)
                     || "sms".equals(scheme)
                     || "whatsapp".equals(scheme)
-                    || "market".equals(scheme)
-                    || "http".equals(scheme)
-                    || "https".equals(scheme)) {
+                    || "market".equals(scheme)) {
                 Intent external = new Intent(Intent.ACTION_VIEW, uri);
                 if (external.resolveActivity(getPackageManager()) != null) {
                     startActivity(external);
@@ -702,6 +709,25 @@ public class TagerActivity extends Activity {
 
         Toast.makeText(this, "تم حظر رابط غير مدعوم", Toast.LENGTH_SHORT).show();
         return true;
+    }
+
+    private void openExternalWebLink(Uri uri) {
+        try {
+            CustomTabsIntent customTabs = new CustomTabsIntent.Builder()
+                    .setShowTitle(true)
+                    .setUrlBarHidingEnabled(true)
+                    .setToolbarColor(getColor(R.color.tager_teal))
+                    .setNavigationBarColor(getColor(R.color.white))
+                    .build();
+            customTabs.launchUrl(this, uri);
+        } catch (RuntimeException error) {
+            Intent fallback = new Intent(Intent.ACTION_VIEW, uri);
+            if (fallback.resolveActivity(getPackageManager()) != null) {
+                startActivity(fallback);
+            } else {
+                Toast.makeText(this, "لا يوجد متصفح لفتح الرابط", Toast.LENGTH_SHORT).show();
+            }
+        }
     }
 
     private String resolvePageFromTagerUri(Uri uri) {
