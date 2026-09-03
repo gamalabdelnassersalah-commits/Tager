@@ -91,3 +91,5 @@ def generateVerifiedBranding = tasks.register('generateVerifiedBranding') {
 tasks.named('preBuild').configure {
     dependsOn generateVerifiedBranding
 }
+
+// Tager Android 1.7 complete build trigger.
