@@ -1,4 +1,4 @@
-name: Build Tager Android 2.0.1 Production
+name: Build Tager Android 2.0.2 Production
 
 on:
   push:
@@ -63,6 +63,7 @@ jobs:
       - name: Verify runtime reliability hardening
         run: |
           SRC=android-app/app/src/main/java/com/tager/marketplace/TagerActivity.java
+          LAYOUT=android-app/app/src/main/res/layout/activity_main.xml
           grep -q 'mainFrameLoadFailed' "$SRC"
           grep -q 'camera.setClipData' "$SRC"
           grep -q 'grantUriPermission' "$SRC"
@@ -70,6 +71,9 @@ jobs:
           grep -q 'onPageCommitVisible' "$SRC"
           grep -q 'nativeBottomNav.setPadding' "$SRC"
           grep -q 'fontScale' "$SRC"
+          grep -q 'android:id="@+id/nativeBottomNav"' "$LAYOUT"
+          grep -A4 'android:id="@+id/nativeBottomNav"' "$LAYOUT" | grep -q 'android:layout_height="wrap_content"'
+          grep -A5 'android:id="@+id/nativeBottomNav"' "$LAYOUT" | grep -q 'android:minHeight="72dp"'
           if grep -q 'newProgress >= 60.*showLoading(false)' "$SRC"; then
             echo 'Early splash dismissal regression detected' >&2
             exit 1
@@ -88,25 +92,25 @@ jobs:
 
       - name: Prepare outputs
         run: |
-          cp android-app/app/build/outputs/apk/release/app-release-unsigned.apk Tager-v2.0.1-production-unsigned.apk
-          cp android-app/app/build/outputs/bundle/release/app-release.aab Tager-v2.0.1-production-unsigned.aab
-          sha256sum Tager-v2.0.1-production-unsigned.apk > Tager-v2.0.1-production-unsigned.apk.sha256
-          sha256sum Tager-v2.0.1-production-unsigned.aab > Tager-v2.0.1-production-unsigned.aab.sha256
+          cp android-app/app/build/outputs/apk/release/app-release-unsigned.apk Tager-v2.0.2-production-unsigned.apk
+          cp android-app/app/build/outputs/bundle/release/app-release.aab Tager-v2.0.2-production-unsigned.aab
+          sha256sum Tager-v2.0.2-production-unsigned.apk > Tager-v2.0.2-production-unsigned.apk.sha256
+          sha256sum Tager-v2.0.2-production-unsigned.aab > Tager-v2.0.2-production-unsigned.aab.sha256
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Tager-v2.0.1-production-unsigned-APK
+          name: Tager-v2.0.2-production-unsigned-APK
           path: |
-            Tager-v2.0.1-production-unsigned.apk
-            Tager-v2.0.1-production-unsigned.apk.sha256
+            Tager-v2.0.2-production-unsigned.apk
+            Tager-v2.0.2-production-unsigned.apk.sha256
           retention-days: 30
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: Tager-v2.0.1-production-unsigned-AAB
+          name: Tager-v2.0.2-production-unsigned-AAB
           path: |
-            Tager-v2.0.1-production-unsigned.aab
-            Tager-v2.0.1-production-unsigned.aab.sha256
+            Tager-v2.0.2-production-unsigned.aab
+            Tager-v2.0.2-production-unsigned.aab.sha256
           retention-days: 30
