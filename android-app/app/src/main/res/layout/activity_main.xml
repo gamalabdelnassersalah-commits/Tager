@@ -35,12 +35,18 @@
         android:layout_height="0dp"
         android:layout_weight="1">
 
-        <WebView
-            android:id="@+id/webView"
+        <com.tager.marketplace.TagerSwipeRefreshLayout
+            android:id="@+id/swipeRefresh"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@color/white"
-            android:importantForAccessibility="yes" />
+            android:layout_height="match_parent">
+
+            <WebView
+                android:id="@+id/webView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@color/white"
+                android:importantForAccessibility="yes" />
+        </com.tager.marketplace.TagerSwipeRefreshLayout>
 
         <ProgressBar
             android:id="@+id/progressBar"
