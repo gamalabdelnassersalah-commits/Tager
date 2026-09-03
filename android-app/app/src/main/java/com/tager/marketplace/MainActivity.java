@@ -43,6 +43,7 @@ import androidx.core.content.FileProvider;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Locale;
 
 public class MainActivity extends Activity {
     private static final String HOME_BASE_URL = "https://tager-new.vercel.app/";
@@ -164,7 +165,7 @@ public class MainActivity extends Activity {
             if (recovery != null && !recovery.isEmpty()) return sanitizePage(recovery);
             Uri data = intent.getData();
             if (data != null) {
-                String scheme = data.getScheme() == null ? "" : data.getScheme().toLowerCase();
+                String scheme = data.getScheme() == null ? "" : data.getScheme().toLowerCase(Locale.ROOT);
                 if ("tager".equals(scheme)) {
                     String host = data.getHost();
                     if (host != null && !host.isEmpty() && !"open".equalsIgnoreCase(host)) return sanitizePage(host);
@@ -238,7 +239,7 @@ public class MainActivity extends Activity {
 
     private boolean isTagerHost(String host) {
         if (host == null) return false;
-        String value = host.toLowerCase();
+        String value = host.toLowerCase(Locale.ROOT);
         return "tager-new.vercel.app".equals(value) || value.endsWith(".tager-new.vercel.app");
     }
 
@@ -266,6 +267,7 @@ public class MainActivity extends Activity {
         navCart.setSelected("cart".equals(page));
     }
 
+    @SuppressWarnings("deprecation")
     private void configureWebView() {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -273,6 +275,10 @@ public class MainActivity extends Activity {
         settings.setDatabaseEnabled(true);
         settings.setAllowContentAccess(true);
         settings.setAllowFileAccess(false);
+        settings.setAllowFileAccessFromFileURLs(false);
+        settings.setAllowUniversalAccessFromFileURLs(false);
+        settings.setGeolocationEnabled(false);
+        settings.setSaveFormData(false);
         settings.setLoadWithOverviewMode(true);
         settings.setUseWideViewPort(true);
         settings.setSupportZoom(false);
@@ -300,7 +306,7 @@ public class MainActivity extends Activity {
         webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
         webView.setVerticalScrollBarEnabled(false);
         webView.setHorizontalScrollBarEnabled(false);
-        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
+        WebView.setWebContentsDebuggingEnabled(false);
 
         CookieManager cookies = CookieManager.getInstance();
         cookies.setAcceptCookie(true);
@@ -309,12 +315,12 @@ public class MainActivity extends Activity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                return handleNavigation(request.getUrl());
+                return request == null || handleNavigation(request.getUrl());
             }
 
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                return handleNavigation(Uri.parse(url));
+                return url == null || handleNavigation(Uri.parse(url));
             }
 
             @Override
@@ -509,8 +515,8 @@ public class MainActivity extends Activity {
 
     private boolean handleNavigation(Uri uri) {
         if (uri == null) return true;
-        String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase();
-        String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase();
+        String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+        String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
         if (("http".equals(scheme) || "https".equals(scheme)) && isTagerHost(host)) return false;
         try {
             if ("tager".equals(scheme)) {
@@ -525,8 +531,12 @@ public class MainActivity extends Activity {
                 if (parsed.resolveActivity(getPackageManager()) != null) startActivity(parsed);
                 else {
                     String fallback = parsed.getStringExtra("browser_fallback_url");
-                    if (fallback != null && !fallback.isEmpty()) handleNavigation(Uri.parse(fallback));
-                    else Toast.makeText(this, "التطبيق المطلوب غير مثبت", Toast.LENGTH_SHORT).show();
+                    if (fallback != null && !fallback.isEmpty()) {
+                        Uri fallbackUri = Uri.parse(fallback);
+                        String fallbackScheme = fallbackUri.getScheme() == null ? "" : fallbackUri.getScheme().toLowerCase(Locale.ROOT);
+                        if ("http".equals(fallbackScheme) || "https".equals(fallbackScheme)) handleNavigation(fallbackUri);
+                        else Toast.makeText(this, "رابط الرجوع غير آمن", Toast.LENGTH_SHORT).show();
+                    } else Toast.makeText(this, "التطبيق المطلوب غير مثبت", Toast.LENGTH_SHORT).show();
                 }
                 return true;
             }
@@ -540,7 +550,8 @@ public class MainActivity extends Activity {
             Toast.makeText(this, "تعذر فتح الرابط", Toast.LENGTH_SHORT).show();
             return true;
         }
-        return false;
+        Toast.makeText(this, "تم حظر رابط غير مدعوم", Toast.LENGTH_SHORT).show();
+        return true;
     }
 
     private String resolvePageFromTagerUri(Uri uri) {
@@ -551,14 +562,21 @@ public class MainActivity extends Activity {
 
     private void startDownload(String url, String userAgent, String contentDisposition, String mimeType) {
         try {
-            String fileName = URLUtil.guessFileName(url, contentDisposition, mimeType);
-            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+            Uri uri = Uri.parse(url);
+            String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+            if (!"http".equals(scheme) && !"https".equals(scheme)) throw new IllegalArgumentException("Unsupported download scheme");
+
+            String fileName = URLUtil.guessFileName(url, contentDisposition, mimeType)
+                    .replaceAll("[\\\\/:*?\"<>|]", "_");
+            if (fileName.trim().isEmpty()) fileName = "tager-download";
+
+            DownloadManager.Request request = new DownloadManager.Request(uri);
             if (mimeType != null && !mimeType.isEmpty()) request.setMimeType(mimeType);
             request.setTitle(fileName);
             request.setDescription("Tager | تاجر");
-            request.addRequestHeader("User-Agent", userAgent);
+            if (userAgent != null && !userAgent.isEmpty()) request.addRequestHeader("User-Agent", userAgent);
             String cookie = CookieManager.getInstance().getCookie(url);
-            if (cookie != null) request.addRequestHeader("Cookie", cookie);
+            if (cookie != null && !cookie.isEmpty()) request.addRequestHeader("Cookie", cookie);
             request.setAllowedOverMetered(true);
             request.setAllowedOverRoaming(false);
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
@@ -574,22 +592,62 @@ public class MainActivity extends Activity {
     }
 
     private void openFileAndCameraChooser(WebChromeClient.FileChooserParams params) {
+        boolean allowMultiple = params != null && params.getMode() == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE;
+        String[] acceptTypes = params == null ? new String[0] : params.getAcceptTypes();
+        boolean acceptsImages = acceptsImages(acceptTypes);
+
         Intent fileIntent;
         try {
-            fileIntent = params.createIntent();
-            fileIntent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+            fileIntent = params == null ? null : params.createIntent();
+            if (fileIntent == null) throw new IllegalStateException("No file intent");
+            fileIntent.addCategory(Intent.CATEGORY_OPENABLE);
+            fileIntent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, allowMultiple);
         } catch (Exception error) {
             fileIntent = new Intent(Intent.ACTION_GET_CONTENT);
             fileIntent.addCategory(Intent.CATEGORY_OPENABLE);
-            fileIntent.setType("*/*");
-            fileIntent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+            fileIntent.setType(resolvePrimaryMimeType(acceptTypes));
+            if (acceptTypes.length > 1) fileIntent.putExtra(Intent.EXTRA_MIME_TYPES, sanitizeAcceptTypes(acceptTypes));
+            fileIntent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, allowMultiple);
         }
-        Intent cameraIntent = createFullResolutionCameraIntent();
+
+        Intent cameraIntent = acceptsImages ? createFullResolutionCameraIntent() : null;
+        if (params != null && params.isCaptureEnabled() && cameraIntent != null) {
+            startActivityForResult(cameraIntent, FILE_CHOOSER_REQUEST);
+            return;
+        }
+
         Intent chooser = new Intent(Intent.ACTION_CHOOSER);
         chooser.putExtra(Intent.EXTRA_INTENT, fileIntent);
-        chooser.putExtra(Intent.EXTRA_TITLE, "اختر ملفات أو التقط صورة");
+        chooser.putExtra(Intent.EXTRA_TITLE, acceptsImages ? "اختر ملفًا أو التقط صورة" : "اختر ملفًا");
         if (cameraIntent != null) chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{cameraIntent});
         startActivityForResult(chooser, FILE_CHOOSER_REQUEST);
+    }
+
+    private boolean acceptsImages(String[] acceptTypes) {
+        if (acceptTypes == null || acceptTypes.length == 0) return true;
+        for (String type : acceptTypes) {
+            if (type == null || type.trim().isEmpty() || "*/*".equals(type.trim()) || type.toLowerCase(Locale.ROOT).startsWith("image/")) return true;
+        }
+        return false;
+    }
+
+    private String resolvePrimaryMimeType(String[] acceptTypes) {
+        if (acceptTypes == null || acceptTypes.length == 0) return "*/*";
+        for (String type : acceptTypes) {
+            if (type != null && type.contains("/") && !type.trim().isEmpty()) return type.trim();
+        }
+        return "*/*";
+    }
+
+    private String[] sanitizeAcceptTypes(String[] acceptTypes) {
+        if (acceptTypes == null || acceptTypes.length == 0) return new String[]{"*/*"};
+        int count = 0;
+        for (String type : acceptTypes) if (type != null && type.contains("/") && !type.trim().isEmpty()) count++;
+        if (count == 0) return new String[]{"*/*"};
+        String[] result = new String[count];
+        int index = 0;
+        for (String type : acceptTypes) if (type != null && type.contains("/") && !type.trim().isEmpty()) result[index++] = type.trim();
+        return result;
     }
 
     private Intent createFullResolutionCameraIntent() {
