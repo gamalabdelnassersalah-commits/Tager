@@ -1,0 +1,56 @@
+name: Validate Tager Android 1.6 Comprehensive
+
+on:
+  push:
+    branches: [ android-v1.6-comprehensive ]
+    paths:
+      - 'android-app/**'
+      - '.github/workflows/tager-android-v16-comprehensive.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 36
+        run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Build APK and release bundle
+        working-directory: android-app
+        run: gradle --no-daemon :app:assembleDebug :app:bundleRelease
+
+      - name: Prepare outputs
+        run: |
+          cp android-app/app/build/outputs/apk/debug/app-debug.apk Tager-v1.6.0-comprehensive-test.apk
+          cp android-app/app/build/outputs/bundle/release/app-release.aab Tager-v1.6.0-unsigned.aab
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tager-v1.6.0-comprehensive-test-APK
+          path: Tager-v1.6.0-comprehensive-test.apk
+          retention-days: 30
+
+      - name: Upload unsigned AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tager-v1.6.0-comprehensive-unsigned-AAB
+          path: Tager-v1.6.0-unsigned.aab
+          retention-days: 30
