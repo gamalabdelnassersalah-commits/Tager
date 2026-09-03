@@ -13,21 +13,30 @@ android {
         applicationId 'com.tager.marketplace'
         minSdk 23
         targetSdk 36
-        versionCode 13
-        versionName '1.7.0'
+        versionCode 14
+        versionName '1.8.0'
     }
 
     buildFeatures {
         buildConfig true
     }
 
+    lint {
+        abortOnError true
+        checkReleaseBuilds true
+        warningsAsErrors false
+        disable 'ObsoleteSdkInt'
+    }
+
     buildTypes {
         debug {
             debuggable true
+            minifyEnabled false
         }
         release {
-            minifyEnabled false
             debuggable false
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -91,5 +100,3 @@ def generateVerifiedBranding = tasks.register('generateVerifiedBranding') {
 tasks.named('preBuild').configure {
     dependsOn generateVerifiedBranding
 }
-
-// Tager Android 1.7 complete build trigger.
