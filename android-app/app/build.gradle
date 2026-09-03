@@ -1,6 +1,5 @@
 import java.security.MessageDigest
 import java.util.Base64
-import java.util.zip.ZipFile
 
 plugins {
     id 'com.android.application'
@@ -69,13 +68,6 @@ static String sha256(File file) {
     return digest.digest().collect { String.format('%02x', it) }.join()
 }
 
-def assertWebP = { File file ->
-    byte[] bytes = file.bytes
-    if (bytes.length < 12 || new String(bytes, 0, 4, 'US-ASCII') != 'RIFF' || new String(bytes, 8, 4, 'US-ASCII') != 'WEBP') {
-        throw new GradleException("Invalid WebP branding file: ${file.name}")
-    }
-}
-
 def decodeParts = { List<File> parts, File output, String expectedSha ->
     String encoded = parts.collect { it.getText('UTF-8').replaceAll('\\s+', '') }.join('')
     byte[] bytes = Base64.decoder.decode(encoded)
@@ -85,7 +77,9 @@ def decodeParts = { List<File> parts, File output, String expectedSha ->
     if (actual != expectedSha) {
         throw new GradleException("Branding SHA mismatch for ${output.name}: ${actual}")
     }
-    assertWebP(output)
+    if (bytes.length < 12 || new String(bytes, 0, 4, 'US-ASCII') != 'RIFF' || new String(bytes, 8, 4, 'US-ASCII') != 'WEBP') {
+        throw new GradleException("Invalid WebP branding file: ${output.name}")
+    }
 }
 
 def generateVerifiedBranding = tasks.register('generateVerifiedBranding') {
@@ -115,54 +109,6 @@ def generateVerifiedBranding = tasks.register('generateVerifiedBranding') {
     }
 }
 
-def brandingV2 = [
-    'tager_nav_home.webp'      : 'c4f3a25d38a32b0953b688d549eaa302bb64946a2dd913d0fa787f5f9fa2e725',
-    'tager_nav_products.webp'  : '4ade9f81ca7fcbeb74c67e35e60e78d3b66f65af7a3b3f65593ade60d762d49e',
-    'tager_nav_suppliers.webp' : 'fb5650080f3b1d0a2a59f3792e64b6efc87c1ccad7c67c332095dcedcacfb8ba',
-    'tager_nav_track.webp'     : 'd8bd4327b0828a29ff2a6120094b461020688084a15550f60e50b8a5d05a0c26',
-    'tager_nav_cart.webp'      : '9ecd408174ecd8c87d93f18d48359681dde354c2dad72ede85b7f3b63dd4d5b3',
-    'tager_splash_new.webp'    : '9199bfc33bc2bf1047c518eeddc528b2f06359a8725b7ebc8e17b5a59524f859',
-    'tager_launcher_new.webp'  : 'd6021a8baf0fbd9894d2b7c78584ded33d45f08c0ea96faecfb3bf3012aef94e'
-]
-
-def installVerifiedBrandingV2 = tasks.register('installVerifiedBrandingV2') {
-    def archive = file("$rootDir/branding/assets_v2.zip")
-    def outputDir = file("$projectDir/src/main/res/drawable-nodpi")
-    inputs.file(archive)
-    outputs.files(
-        new File(outputDir, 'tager_nav_home.webp'),
-        new File(outputDir, 'tager_nav_products.webp'),
-        new File(outputDir, 'tager_nav_suppliers.webp'),
-        new File(outputDir, 'tager_nav_track.webp'),
-        new File(outputDir, 'tager_nav_cart.webp'),
-        new File(outputDir, 'tager_splash.webp'),
-        new File(outputDir, 'tager_launcher.webp')
-    )
-    doLast {
-        outputDir.mkdirs()
-        ZipFile zip = new ZipFile(archive)
-        try {
-            brandingV2.each { name, expectedSha ->
-                def entry = zip.getEntry(name)
-                if (entry == null) throw new GradleException("Missing branding asset: ${name}")
-                String outputName = name == 'tager_splash_new.webp'
-                        ? 'tager_splash.webp'
-                        : (name == 'tager_launcher_new.webp' ? 'tager_launcher.webp' : name)
-                File output = new File(outputDir, outputName)
-                output.withOutputStream { out -> zip.getInputStream(entry).withCloseable { input -> out << input } }
-                String actual = sha256(output)
-                if (actual != expectedSha) {
-                    throw new GradleException("Branding SHA mismatch for ${name}: ${actual}")
-                }
-                assertWebP(output)
-            }
-        } finally {
-            zip.close()
-        }
-    }
-}
-
 tasks.named('preBuild').configure {
     dependsOn generateVerifiedBranding
-    dependsOn installVerifiedBrandingV2
 }
