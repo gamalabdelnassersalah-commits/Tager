@@ -344,6 +344,15 @@ public class TagerActivity extends Activity {
         navCart.setSelected("cart".equals(page));
     }
 
+    private boolean isLowRamDevice() {
+        ActivityManager activityManager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+        return activityManager != null && activityManager.isLowRamDevice();
+    }
+
+    private boolean shouldUseOffscreenPreRaster() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !safeMode && !isLowRamDevice();
+    }
+
     @SuppressWarnings("deprecation")
     private void configureWebView() {
         WebSettings settings = webView.getSettings();
@@ -371,9 +380,8 @@ public class TagerActivity extends Activity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setUserAgentString(settings.getUserAgentString() + " TagerAndroidApp/" + BuildConfig.VERSION_NAME);
 
-        ActivityManager activityManager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-        boolean lowRam = activityManager != null && activityManager.isLowRamDevice();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !lowRam && !safeMode) {
+        boolean lowRam = isLowRamDevice();
+        if (shouldUseOffscreenPreRaster()) {
             settings.setOffscreenPreRaster(true);
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -613,7 +621,9 @@ public class TagerActivity extends Activity {
                 showStatus("الاتصال بالإنترنت غير متاح حاليًا");
             } else if (restored) {
                 showStatus("عاد الاتصال بالإنترنت");
-                mainHandler.postDelayed(this::hideStatus, 1300L);
+                mainHandler.postDelayed(() -> {
+                    if (isOnline() && offlinePanel.getVisibility() != View.VISIBLE) hideStatus();
+                }, 1300L);
             }
             if (restored && offlinePanel.getVisibility() == View.VISIBLE) retryCurrentPage();
         });
@@ -961,6 +971,18 @@ public class TagerActivity extends Activity {
         }
     }
 
+    private boolean restoreLastGoodPage() {
+        if (webView == null) return false;
+        String lastGood = preferences.getString(PREF_LAST_GOOD_URL, "");
+        if (!isTagerUrl(lastGood)) return false;
+        mainFrameLoadFailed = false;
+        webView.getSettings().setCacheMode(
+                isOnline() ? WebSettings.LOAD_DEFAULT : WebSettings.LOAD_CACHE_ELSE_NETWORK);
+        showLoading(true);
+        webView.loadUrl(lastGood);
+        return true;
+    }
+
     private boolean isOnline() {
         ConnectivityManager manager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         if (manager == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true;
@@ -995,6 +1017,12 @@ public class TagerActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (webView != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                try {
+                    webView.getSettings().setOffscreenPreRaster(shouldUseOffscreenPreRaster());
+                } catch (RuntimeException ignored) {
+                }
+            }
             webView.onResume();
             webView.resumeTimers();
         }
@@ -1021,7 +1049,14 @@ public class TagerActivity extends Activity {
         if (webView != null && webView.getUrl() != null && !mainFrameLoadFailed) {
             rememberGoodUrl(webView.getUrl());
         }
-        if (webView != null && level >= TRIM_MEMORY_UI_HIDDEN) webView.pauseTimers();
+        if (webView == null) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && level >= TRIM_MEMORY_RUNNING_LOW) {
+            try {
+                webView.getSettings().setOffscreenPreRaster(false);
+            } catch (RuntimeException ignored) {
+            }
+        }
+        if (level >= TRIM_MEMORY_UI_HIDDEN) webView.pauseTimers();
     }
 
     @Override
@@ -1056,7 +1091,17 @@ public class TagerActivity extends Activity {
         if (offlinePanel.getVisibility() == View.VISIBLE) {
             offlinePanel.setVisibility(View.GONE);
             hideStatus();
-            if (webView != null && webView.canGoBack()) webView.goBack();
+            if (webView != null && webView.canGoBack()) {
+                mainFrameLoadFailed = false;
+                webView.goBack();
+                return;
+            }
+            if (restoreLastGoodPage()) return;
+            if (!isOnline()) {
+                moveTaskToBack(true);
+                return;
+            }
+            navigateTo(preferences.getString(PREF_LAST_PAGE, "home"));
             return;
         }
         if (webView != null && webView.canGoBack()) {
