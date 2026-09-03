@@ -20,14 +20,21 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 /**
  * Native pull-to-refresh surface for the Tager WebView.
  *
- * The legacy activity still contains a fallback touch gesture, but this parent
- * intercepts a real pull gesture first and provides the standard Android refresh
- * indicator. Refresh is only triggered with validated internet connectivity and
- * the indicator stays active until WebView finishes or a timeout is reached.
+ * The refresh gesture is intercepted by this parent before the WebView receives
+ * a completed long pull, preventing duplicate refreshes from legacy touch
+ * fallbacks. Refresh is debounced, requires validated connectivity and keeps the
+ * native indicator visible long enough to communicate that a real reload began.
  */
 public class TagerSwipeRefreshLayout extends SwipeRefreshLayout {
     private static final long REFRESH_TIMEOUT_MS = 15000L;
     private static final long PROGRESS_POLL_MS = 120L;
+    private static final long MIN_INDICATOR_MS = 650L;
+    private static final long MIN_REFRESH_INTERVAL_MS = 1200L;
+
+    private Runnable completionPoll;
+    private boolean refreshInFlight;
+    private long lastRefreshAt;
+    private long refreshStartedAt;
 
     public TagerSwipeRefreshLayout(@NonNull Context context) {
         super(context);
@@ -56,34 +63,63 @@ public class TagerSwipeRefreshLayout extends SwipeRefreshLayout {
     }
 
     private void refreshWebView() {
+        long now = SystemClock.elapsedRealtime();
+        if (refreshInFlight || now - lastRefreshAt < MIN_REFRESH_INTERVAL_MS) {
+            setRefreshing(refreshInFlight);
+            return;
+        }
+
         WebView webView = findWebView();
         if (webView == null) {
-            setRefreshing(false);
+            finishRefresh();
             return;
         }
         if (!isOnline()) {
-            setRefreshing(false);
+            finishRefresh();
             Toast.makeText(getContext(), "لا يوجد اتصال بالإنترنت", Toast.LENGTH_SHORT).show();
             return;
         }
 
+        refreshInFlight = true;
+        lastRefreshAt = now;
+        refreshStartedAt = now;
         performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
         webView.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
         webView.reload();
-        waitForCompletion(webView, SystemClock.elapsedRealtime());
+        scheduleCompletionPoll(webView);
     }
 
-    private void waitForCompletion(WebView webView, long startedAt) {
-        postDelayed(() -> {
-            if (!isRefreshing()) return;
-            boolean finished = webView.getProgress() >= 100;
-            boolean timedOut = SystemClock.elapsedRealtime() - startedAt >= REFRESH_TIMEOUT_MS;
+    private void scheduleCompletionPoll(WebView webView) {
+        if (completionPoll != null) removeCallbacks(completionPoll);
+        completionPoll = () -> {
+            if (!refreshInFlight) return;
+
+            long elapsed = SystemClock.elapsedRealtime() - refreshStartedAt;
+            boolean minimumVisible = elapsed >= MIN_INDICATOR_MS;
+            boolean finished = minimumVisible && webView.getProgress() >= 100;
+            boolean timedOut = elapsed >= REFRESH_TIMEOUT_MS;
             if (finished || timedOut || !isAttachedToWindow()) {
-                setRefreshing(false);
+                finishRefresh();
                 return;
             }
-            waitForCompletion(webView, startedAt);
-        }, PROGRESS_POLL_MS);
+            postDelayed(completionPoll, PROGRESS_POLL_MS);
+        };
+        postDelayed(completionPoll, PROGRESS_POLL_MS);
+    }
+
+    public void finishRefresh() {
+        refreshInFlight = false;
+        if (completionPoll != null) {
+            removeCallbacks(completionPoll);
+            completionPoll = null;
+        }
+        if (isRefreshing()) setRefreshing(false);
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        finishRefresh();
+        super.onDetachedFromWindow();
     }
 
     @Nullable
