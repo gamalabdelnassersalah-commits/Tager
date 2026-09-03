@@ -480,10 +480,16 @@ public class TagerActivity extends Activity {
                 mainFrameLoadFailed = true;
                 cancelSlowLoadWarning();
                 String page = pageFromUrl(view == null ? null : view.getUrl());
-                if (fileCallback != null) {
-                    fileCallback.onReceiveValue(null);
-                    fileCallback = null;
+                cancelFileChooser(null);
+                if (view != null) {
+                    try {
+                        view.stopLoading();
+                        view.removeAllViews();
+                        view.destroy();
+                    } catch (RuntimeException ignored) {
+                    }
                 }
+                if (view == webView) webView = null;
                 restartAfterRendererFailure(page);
                 return true;
             }
@@ -500,7 +506,8 @@ public class TagerActivity extends Activity {
 
             @Override
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
-                if (fileCallback != null) fileCallback.onReceiveValue(null);
+                if (callback == null) return false;
+                cancelFileChooser(null);
                 fileCallback = callback;
                 openFileAndCameraChooser(params);
                 return true;
@@ -736,6 +743,30 @@ public class TagerActivity extends Activity {
         }
     }
 
+    private boolean tryStartFileChooser(Intent intent) {
+        if (intent == null) return false;
+        try {
+            startActivityForResult(intent, FILE_CHOOSER_REQUEST);
+            return true;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
+    private void cancelFileChooser(String message) {
+        ValueCallback<Uri[]> callback = fileCallback;
+        fileCallback = null;
+        try {
+            if (callback != null) callback.onReceiveValue(null);
+        } catch (RuntimeException ignored) {
+        }
+        releaseCameraUriPermissions();
+        cameraOutputUri = null;
+        if (message != null && !message.isEmpty()) {
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private void openFileAndCameraChooser(WebChromeClient.FileChooserParams params) {
         boolean allowMultiple = params != null
                 && params.getMode() == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE;
@@ -760,8 +791,10 @@ public class TagerActivity extends Activity {
 
         Intent cameraIntent = acceptsImages ? createFullResolutionCameraIntent() : null;
         if (params != null && params.isCaptureEnabled() && cameraIntent != null) {
-            startActivityForResult(cameraIntent, FILE_CHOOSER_REQUEST);
-            return;
+            if (tryStartFileChooser(cameraIntent)) return;
+            releaseCameraUriPermissions();
+            cameraOutputUri = null;
+            cameraIntent = null;
         }
 
         Intent chooser = new Intent(Intent.ACTION_CHOOSER);
@@ -770,7 +803,9 @@ public class TagerActivity extends Activity {
         if (cameraIntent != null) {
             chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{cameraIntent});
         }
-        startActivityForResult(chooser, FILE_CHOOSER_REQUEST);
+        if (!tryStartFileChooser(chooser)) {
+            cancelFileChooser("تعذر فتح الكاميرا أو مدير الملفات");
+        }
     }
 
     private boolean acceptsImages(String[] acceptTypes) {
@@ -869,25 +904,34 @@ public class TagerActivity extends Activity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode != FILE_CHOOSER_REQUEST || fileCallback == null) return;
 
+        ValueCallback<Uri[]> callback = fileCallback;
+        fileCallback = null;
         Uri[] result = null;
-        if (resultCode == RESULT_OK) {
-            if (data != null && data.getClipData() != null) {
-                ClipData clips = data.getClipData();
-                result = new Uri[clips.getItemCount()];
-                for (int i = 0; i < clips.getItemCount(); i++) {
-                    result[i] = clips.getItemAt(i).getUri();
+        try {
+            if (resultCode == RESULT_OK) {
+                if (data != null && data.getClipData() != null) {
+                    ClipData clips = data.getClipData();
+                    result = new Uri[clips.getItemCount()];
+                    for (int i = 0; i < clips.getItemCount(); i++) {
+                        result[i] = clips.getItemAt(i).getUri();
+                    }
+                } else if (data != null && data.getData() != null) {
+                    result = new Uri[]{data.getData()};
+                } else if (cameraOutputUri != null) {
+                    result = new Uri[]{cameraOutputUri};
                 }
-            } else if (data != null && data.getData() != null) {
-                result = new Uri[]{data.getData()};
-            } else if (cameraOutputUri != null) {
-                result = new Uri[]{cameraOutputUri};
             }
+        } catch (RuntimeException ignored) {
+            result = null;
         }
 
-        fileCallback.onReceiveValue(result);
-        fileCallback = null;
-        releaseCameraUriPermissions();
-        cameraOutputUri = null;
+        try {
+            callback.onReceiveValue(result);
+        } catch (RuntimeException ignored) {
+        } finally {
+            releaseCameraUriPermissions();
+            cameraOutputUri = null;
+        }
     }
 
     private void retryCurrentPage() {
@@ -989,10 +1033,7 @@ public class TagerActivity extends Activity {
             getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backInvokedCallback);
             backInvokedCallback = null;
         }
-        if (fileCallback != null) fileCallback.onReceiveValue(null);
-        fileCallback = null;
-        releaseCameraUriPermissions();
-        cameraOutputUri = null;
+        cancelFileChooser(null);
         if (webView != null) {
             try {
                 webView.stopLoading();
