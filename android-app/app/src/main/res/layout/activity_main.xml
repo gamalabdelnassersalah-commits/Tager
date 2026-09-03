@@ -9,10 +9,15 @@
         android:id="@+id/statusBanner"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:minHeight="48dp"
         android:layout_marginStart="10dp"
         android:layout_marginEnd="10dp"
         android:layout_marginTop="6dp"
         android:gravity="center"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
         android:background="@drawable/status_banner_bg"
         android:text="جاري الاتصال..."
         android:textColor="@color/tager_teal_dark"
@@ -20,6 +25,9 @@
         android:textStyle="bold"
         android:clickable="true"
         android:focusable="true"
+        android:accessibilityLiveRegion="polite"
+        android:importantForAccessibility="yes"
+        android:contentDescription="حالة الاتصال. اضغط لإعادة المحاولة"
         android:visibility="gone" />
 
     <FrameLayout
@@ -31,7 +39,8 @@
             android:id="@+id/webView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="@color/white" />
+            android:background="@color/white"
+            android:importantForAccessibility="yes" />
 
         <ProgressBar
             android:id="@+id/progressBar"
@@ -41,20 +50,22 @@
             android:layout_gravity="top"
             android:max="100"
             android:progressTint="@color/tager_orange"
+            android:importantForAccessibility="no"
             android:visibility="gone" />
 
         <FrameLayout
             android:id="@+id/nativeLoading"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="@color/white">
+            android:background="@color/white"
+            android:importantForAccessibility="noHideDescendants">
 
             <ImageView
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:scaleType="centerCrop"
                 android:src="@drawable/tager_splash"
-                android:contentDescription="Tager loading" />
+                android:contentDescription="@null" />
 
             <ProgressBar
                 style="?android:attr/progressBarStyle"
@@ -62,7 +73,8 @@
                 android:layout_height="40dp"
                 android:layout_gravity="center_horizontal|bottom"
                 android:layout_marginBottom="42dp"
-                android:indeterminateTint="@color/tager_orange" />
+                android:indeterminateTint="@color/tager_orange"
+                android:importantForAccessibility="no" />
         </FrameLayout>
 
         <LinearLayout
@@ -73,6 +85,7 @@
             android:gravity="center"
             android:padding="34dp"
             android:background="@color/white"
+            android:importantForAccessibility="yes"
             android:visibility="gone">
 
             <ImageView
@@ -81,7 +94,7 @@
                 android:adjustViewBounds="true"
                 android:scaleType="fitCenter"
                 android:src="@drawable/tager_launcher"
-                android:contentDescription="Tager" />
+                android:contentDescription="@null" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -90,7 +103,8 @@
                 android:text="تعذر الاتصال"
                 android:textColor="@color/tager_teal_dark"
                 android:textStyle="bold"
-                android:textSize="24sp" />
+                android:textSize="24sp"
+                android:accessibilityHeading="true" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -104,12 +118,16 @@
             <Button
                 android:id="@+id/retryButton"
                 android:layout_width="210dp"
-                android:layout_height="50dp"
+                android:layout_height="wrap_content"
+                android:minHeight="50dp"
                 android:layout_marginTop="24dp"
+                android:paddingTop="10dp"
+                android:paddingBottom="10dp"
                 android:text="إعادة المحاولة"
                 android:textAllCaps="false"
                 android:textStyle="bold"
                 android:textColor="@color/white"
+                android:contentDescription="إعادة محاولة الاتصال"
                 android:backgroundTint="@color/tager_teal" />
         </LinearLayout>
     </FrameLayout>
@@ -126,7 +144,8 @@
         android:paddingTop="5dp"
         android:paddingBottom="5dp"
         android:background="@color/white"
-        android:elevation="12dp">
+        android:elevation="12dp"
+        android:importantForAccessibility="yes">
 
         <TextView
             android:id="@+id/navHome"
@@ -146,7 +165,8 @@
             android:textSize="11sp"
             android:textStyle="bold"
             android:clickable="true"
-            android:focusable="true" />
+            android:focusable="true"
+            android:contentDescription="الرئيسية" />
 
         <TextView
             android:id="@+id/navProducts"
@@ -166,7 +186,8 @@
             android:textSize="11sp"
             android:textStyle="bold"
             android:clickable="true"
-            android:focusable="true" />
+            android:focusable="true"
+            android:contentDescription="المنتجات" />
 
         <TextView
             android:id="@+id/navSuppliers"
@@ -186,7 +207,8 @@
             android:textSize="11sp"
             android:textStyle="bold"
             android:clickable="true"
-            android:focusable="true" />
+            android:focusable="true"
+            android:contentDescription="الموردون" />
 
         <TextView
             android:id="@+id/navTrack"
@@ -206,7 +228,8 @@
             android:textSize="11sp"
             android:textStyle="bold"
             android:clickable="true"
-            android:focusable="true" />
+            android:focusable="true"
+            android:contentDescription="تتبع الطلب" />
 
         <TextView
             android:id="@+id/navCart"
@@ -226,6 +249,7 @@
             android:textSize="11sp"
             android:textStyle="bold"
             android:clickable="true"
-            android:focusable="true" />
+            android:focusable="true"
+            android:contentDescription="سلة المشتريات" />
     </LinearLayout>
 </LinearLayout>
