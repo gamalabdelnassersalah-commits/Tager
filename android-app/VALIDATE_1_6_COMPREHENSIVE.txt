@@ -1,0 +1,2 @@
+Tager Android 1.6.0 comprehensive validation marker.
+Validate native navigation resources, Android build, APK and unsigned AAB before merge.
