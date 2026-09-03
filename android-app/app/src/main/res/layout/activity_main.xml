@@ -117,7 +117,8 @@
     <LinearLayout
         android:id="@+id/nativeBottomNav"
         android:layout_width="match_parent"
-        android:layout_height="72dp"
+        android:layout_height="wrap_content"
+        android:minHeight="72dp"
         android:orientation="horizontal"
         android:gravity="center"
         android:paddingStart="6dp"
@@ -130,7 +131,7 @@
         <TextView
             android:id="@+id/navHome"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="72dp"
             android:layout_weight="1"
             android:gravity="center"
             android:background="@drawable/nav_item_bg"
@@ -147,7 +148,7 @@
         <TextView
             android:id="@+id/navProducts"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="72dp"
             android:layout_weight="1"
             android:gravity="center"
             android:background="@drawable/nav_item_bg"
@@ -164,7 +165,7 @@
         <TextView
             android:id="@+id/navSuppliers"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="72dp"
             android:layout_weight="1"
             android:gravity="center"
             android:background="@drawable/nav_item_bg"
@@ -181,7 +182,7 @@
         <TextView
             android:id="@+id/navTrack"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="72dp"
             android:layout_weight="1"
             android:gravity="center"
             android:background="@drawable/nav_item_bg"
@@ -198,7 +199,7 @@
         <TextView
             android:id="@+id/navCart"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="72dp"
             android:layout_weight="1"
             android:gravity="center"
             android:background="@drawable/nav_item_bg"
