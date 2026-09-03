@@ -69,6 +69,16 @@ jobs:
           sha256sum Tager-v1.9.0-production-unsigned.apk > Tager-v1.9.0-production-unsigned.apk.sha256
           sha256sum Tager-v1.9.0-production-unsigned.aab > Tager-v1.9.0-production-unsigned.aab.sha256
 
+      - name: Package Android signing tools
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          TOOLS="$SDK_ROOT/build-tools/35.0.0"
+          mkdir -p signing-tools/lib
+          cp "$TOOLS/apksigner" signing-tools/
+          cp "$TOOLS/lib/apksigner.jar" signing-tools/lib/
+          cp "$TOOLS/zipalign" signing-tools/
+          chmod +x signing-tools/apksigner signing-tools/zipalign
+
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
@@ -86,3 +96,10 @@ jobs:
             Tager-v1.9.0-production-unsigned.aab
             Tager-v1.9.0-production-unsigned.aab.sha256
           retention-days: 30
+
+      - name: Upload Android signing tools
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-build-tools-35-signing
+          path: signing-tools
+          retention-days: 1
