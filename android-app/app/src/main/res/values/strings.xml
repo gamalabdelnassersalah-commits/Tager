@@ -9,4 +9,6 @@
     <string name="shortcut_cart_long">فتح سلة المشتريات</string>
     <string name="shortcut_downloads_short">التنزيلات</string>
     <string name="shortcut_downloads_long">فتح مركز تنزيلات تاجر</string>
+    <string name="shortcut_settings_short">الإعدادات</string>
+    <string name="shortcut_settings_long">إعدادات وحالة تطبيق تاجر</string>
 </resources>
