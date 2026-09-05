@@ -7,8 +7,10 @@ APP="app/src/main/java/com/tager/marketplace/TagerApplication.java"
 UPDATE="app/src/main/java/com/tager/marketplace/TagerUpdateCoordinator.java"
 NOTIFY="app/src/main/java/com/tager/marketplace/TagerNotificationCenter.java"
 WORKER="app/src/main/java/com/tager/marketplace/TagerMaintenanceWorker.java"
+CRASH="app/src/main/java/com/tager/marketplace/TagerCrashRecorder.java"
 SHORTCUTS="app/src/main/res/xml/shortcuts.xml"
 ACTIVITY="app/src/main/java/com/tager/marketplace/TagerActivity.java"
+NOTIFICATION_ICON="app/src/main/res/drawable/ic_notification_tager.xml"
 
 # Core native dependencies and external navigation protection.
 grep -q "androidx.browser:browser:1.10.0" "$BUILD"
@@ -24,9 +26,22 @@ grep -q 'PeriodicWorkRequest' "$APP"
 grep -q 'ExistingPeriodicWorkPolicy.UPDATE' "$APP"
 grep -q 'TagerMaintenanceWorker.class' "$APP"
 grep -q 'class TagerMaintenanceWorker' "$WORKER"
+grep -q 'TagerCrashRecorder.clearStale' "$WORKER"
 grep -q 'AppUpdateManagerFactory.create' "$UPDATE"
 grep -q 'AppUpdateType.FLEXIBLE' "$UPDATE"
 grep -q 'completeUpdate()' "$UPDATE"
+grep -q 'CHECK_INTERVAL_MS' "$UPDATE"
+grep -q 'KEY_LAST_CHECK_AT' "$UPDATE"
+
+# Privacy-safe local crash health recording.
+test -f "$CRASH"
+grep -q 'class TagerCrashRecorder' "$CRASH"
+grep -q 'BuildConfig.VERSION_NAME' "$CRASH"
+grep -q 'Thread.setDefaultUncaughtExceptionHandler' "$APP"
+if grep -Eq 'getMessage\(|printStackTrace|StackTraceElement' "$CRASH"; then
+  echo 'Crash recorder must not persist messages or stack traces' >&2
+  exit 1
+fi
 
 # Notification readiness without forcing permission prompts.
 grep -q 'android.permission.POST_NOTIFICATIONS' "$MANIFEST"
@@ -36,6 +51,8 @@ grep -q 'CHANNEL_DOWNLOADS' "$APP"
 grep -q 'class TagerNotificationCenter' "$NOTIFY"
 grep -q 'PendingIntent.FLAG_IMMUTABLE' "$NOTIFY"
 grep -q 'tager://' "$NOTIFY"
+grep -q 'ic_notification_tager' "$NOTIFY"
+test -f "$NOTIFICATION_ICON"
 
 # Native launcher shortcuts and deep-link routing.
 grep -q 'android.app.shortcuts' "$MANIFEST"
