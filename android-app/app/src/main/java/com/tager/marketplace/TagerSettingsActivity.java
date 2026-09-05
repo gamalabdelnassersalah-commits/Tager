@@ -41,6 +41,7 @@ public class TagerSettingsActivity extends Activity {
     private static final int NOTIFICATION_PERMISSION_REQUEST = 7301;
     private static final int TEST_NOTIFICATION_ID = 730100;
 
+    private TextView healthSummaryStatus;
     private TextView notificationStatus;
     private TextView channelStatus;
     private TextView runtimeStatus;
@@ -62,6 +63,7 @@ public class TagerSettingsActivity extends Activity {
         refreshRuntimeStatus();
         refreshNetworkStatus();
         refreshWebViewStatus();
+        refreshHealthSummary();
     }
 
     private View buildContent() {
@@ -92,6 +94,7 @@ public class TagerSettingsActivity extends Activity {
         subtitleParams.topMargin = dp(6);
         root.addView(subtitle, subtitleParams);
 
+        root.addView(buildHealthSummaryCard());
         root.addView(buildNotificationCard());
         root.addView(buildNetworkHealthCard());
         root.addView(buildWebViewHealthCard());
@@ -99,6 +102,40 @@ public class TagerSettingsActivity extends Activity {
         root.addView(buildAppInfoCard());
         root.addView(buildActionsCard());
         return scroll;
+    }
+
+    private View buildHealthSummaryCard() {
+        LinearLayout card = newCard();
+        card.addView(heading("الفحص السريع"));
+
+        healthSummaryStatus = new TextView(this);
+        healthSummaryStatus.setText("جاري فحص صحة التطبيق والجهاز…");
+        healthSummaryStatus.setTextSize(15f);
+        healthSummaryStatus.setTextColor(getColor(R.color.tager_text_muted));
+        healthSummaryStatus.setLineSpacing(0f, 1.22f);
+        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(-1, -2);
+        statusParams.topMargin = dp(7);
+        card.addView(healthSummaryStatus, statusParams);
+
+        TextView hint = new TextView(this);
+        hint.setText("يجمع حالة الشبكة وWebView والإشعارات والاستقرار المحلي في نتيجة واحدة بدون قراءة بيانات الحساب.");
+        hint.setTextSize(12f);
+        hint.setTextColor(getColor(R.color.tager_text_muted));
+        LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(-1, -2);
+        hintParams.topMargin = dp(7);
+        card.addView(hint, hintParams);
+
+        Button refresh = actionButton("تحديث الفحص الآن");
+        refresh.setOnClickListener(v -> {
+            refreshNotificationStatus();
+            refreshNetworkStatus();
+            refreshWebViewStatus();
+            refreshRuntimeStatus();
+            refreshHealthSummary();
+            Toast.makeText(this, "تم تحديث حالة تاجر", Toast.LENGTH_SHORT).show();
+        });
+        addButton(card, refresh);
+        return card;
     }
 
     private View buildNotificationCard() {
@@ -328,6 +365,11 @@ public class TagerSettingsActivity extends Activity {
             enableNotifications();
             return;
         }
+        if (!TagerNotificationCenter.canNotifyChannel(this, TagerApplication.CHANNEL_MESSAGES)) {
+            Toast.makeText(this, "قناة الرسائل متوقفة — فعّلها ثم أعد الاختبار", Toast.LENGTH_SHORT).show();
+            openNotificationChannelSettings(TagerApplication.CHANNEL_MESSAGES);
+            return;
+        }
         TagerNotificationCenter.showMessageNotification(
                 this,
                 TEST_NOTIFICATION_ID,
@@ -364,9 +406,14 @@ public class TagerSettingsActivity extends Activity {
         boolean permissionGranted = notificationPermissionGranted();
         boolean notificationsEnabled = permissionGranted
                 && NotificationManagerCompat.from(this).areNotificationsEnabled();
+        boolean channelsHealthy = Build.VERSION.SDK_INT < Build.VERSION_CODES.O
+                || (channelEnabled(TagerApplication.CHANNEL_ORDERS)
+                && channelEnabled(TagerApplication.CHANNEL_MESSAGES)
+                && channelEnabled(TagerApplication.CHANNEL_DOWNLOADS));
         TagerCrashRecorder.Snapshot runtime = TagerCrashRecorder.snapshot(this);
         NetworkHealth network = readNetworkHealth();
         PackageInfo webView = currentWebViewPackage();
+        boolean webViewHealthy = Build.VERSION.SDK_INT < Build.VERSION_CODES.O || webView != null;
 
         StringBuilder report = new StringBuilder();
         report.append("Tager Android diagnostics")
@@ -374,6 +421,10 @@ public class TagerSettingsActivity extends Activity {
                 .append(" (build ").append(BuildConfig.VERSION_CODE).append(")")
                 .append("\nAndroid: ").append(Build.VERSION.RELEASE)
                 .append(" / API ").append(Build.VERSION.SDK_INT)
+                .append("\nHealth: network=").append(network.connected && network.validated)
+                .append(", webview=").append(webViewHealthy)
+                .append(", notifications=").append(notificationsEnabled && channelsHealthy)
+                .append(", runtime=").append(!runtime.hasCrash())
                 .append("\nNotifications: ").append(notificationsEnabled ? "enabled" : "disabled");
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -403,6 +454,7 @@ public class TagerSettingsActivity extends Activity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode != NOTIFICATION_PERMISSION_REQUEST) return;
         refreshNotificationStatus();
+        refreshHealthSummary();
         boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
         Toast.makeText(
                 this,
@@ -414,6 +466,57 @@ public class TagerSettingsActivity extends Activity {
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
                 || ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void refreshHealthSummary() {
+        if (healthSummaryStatus == null) return;
+
+        NetworkHealth network = readNetworkHealth();
+        boolean networkHealthy = network.connected && network.validated;
+        PackageInfo webView = currentWebViewPackage();
+        boolean webViewHealthy = Build.VERSION.SDK_INT < Build.VERSION_CODES.O || webView != null;
+        boolean notificationsEnabled = notificationPermissionGranted()
+                && NotificationManagerCompat.from(this).areNotificationsEnabled();
+        boolean channelsHealthy = Build.VERSION.SDK_INT < Build.VERSION_CODES.O
+                || (channelEnabled(TagerApplication.CHANNEL_ORDERS)
+                && channelEnabled(TagerApplication.CHANNEL_MESSAGES)
+                && channelEnabled(TagerApplication.CHANNEL_DOWNLOADS));
+        boolean notificationsHealthy = notificationsEnabled && channelsHealthy;
+        TagerCrashRecorder.Snapshot runtime = TagerCrashRecorder.snapshot(this);
+        boolean runtimeHealthy = !runtime.hasCrash();
+
+        int healthyCount = 0;
+        if (networkHealthy) healthyCount++;
+        if (webViewHealthy) healthyCount++;
+        if (notificationsHealthy) healthyCount++;
+        if (runtimeHealthy) healthyCount++;
+
+        if (healthyCount == 4) {
+            healthSummaryStatus.setText("الحالة العامة: سليمة — 4/4 مؤشرات تعمل بشكل طبيعي.\nلا توجد مشكلة محلية ظاهرة في الشبكة أو WebView أو الإشعارات أو استقرار التطبيق.");
+            healthSummaryStatus.setTextColor(getColor(R.color.tager_teal));
+            return;
+        }
+
+        StringBuilder issues = new StringBuilder();
+        issues.append("الحالة العامة: تحتاج انتباه — ").append(healthyCount).append("/4 مؤشرات سليمة.");
+        if (!networkHealthy) {
+            issues.append(network.connected
+                    ? "\n• الشبكة موجودة لكن Android لم يتحقق من وصول الإنترنت."
+                    : "\n• لا توجد شبكة إنترنت نشطة متاحة لتاجر.");
+        }
+        if (!webViewHealthy) {
+            issues.append("\n• تعذر تحديد مزود Android WebView الحالي.");
+        }
+        if (!notificationsHealthy) {
+            issues.append(notificationsEnabled
+                    ? "\n• توجد قناة إشعارات واحدة أو أكثر متوقفة."
+                    : "\n• إشعارات تاجر العامة غير مفعلة.");
+        }
+        if (!runtimeHealthy) {
+            issues.append("\n• يوجد Crash محلي مسجل خلال فترة الاحتفاظ الحالية.");
+        }
+        healthSummaryStatus.setText(issues.toString());
+        healthSummaryStatus.setTextColor(getColor(R.color.tager_orange));
     }
 
     private void refreshNotificationStatus() {
@@ -456,6 +559,11 @@ public class TagerSettingsActivity extends Activity {
         if (webViewStatus == null) return;
         PackageInfo webView = currentWebViewPackage();
         if (webView == null) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                webViewStatus.setText("الحالة: Android أقدم من 8 — فحص مزود WebView التفصيلي غير متاح من النظام.");
+                webViewStatus.setTextColor(getColor(R.color.tager_text_muted));
+                return;
+            }
             webViewStatus.setText("الحالة: تعذر تحديد مزود Android WebView الحالي على هذا الجهاز.");
             webViewStatus.setTextColor(getColor(R.color.tager_orange));
             return;
