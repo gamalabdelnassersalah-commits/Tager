@@ -1,10 +1,14 @@
 package com.tager.marketplace;
 
+import android.app.Activity;
 import android.app.Application;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.os.Build;
+import android.os.Bundle;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.work.Constraints;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.NetworkType;
@@ -19,11 +23,27 @@ public class TagerApplication extends Application {
     public static final String CHANNEL_DOWNLOADS = "tager_downloads";
     private static final String PERIODIC_MAINTENANCE = "tager_periodic_maintenance";
 
+    private TagerUpdateCoordinator updateCoordinator;
+
     @Override
     public void onCreate() {
         super.onCreate();
         createNotificationChannels();
         scheduleMaintenance();
+        updateCoordinator = new TagerUpdateCoordinator(this);
+        registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
+            @Override public void onActivityCreated(@NonNull Activity activity, @Nullable Bundle state) { }
+            @Override public void onActivityStarted(@NonNull Activity activity) { }
+            @Override public void onActivityResumed(@NonNull Activity activity) {
+                if (updateCoordinator != null) updateCoordinator.onActivityResumed(activity);
+            }
+            @Override public void onActivityPaused(@NonNull Activity activity) {
+                if (updateCoordinator != null) updateCoordinator.onActivityPaused(activity);
+            }
+            @Override public void onActivityStopped(@NonNull Activity activity) { }
+            @Override public void onActivitySaveInstanceState(@NonNull Activity activity, @NonNull Bundle outState) { }
+            @Override public void onActivityDestroyed(@NonNull Activity activity) { }
+        });
     }
 
     private void createNotificationChannels() {
