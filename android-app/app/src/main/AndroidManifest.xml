@@ -70,6 +70,12 @@
         </provider>
 
         <activity
+            android:name=".TagerDownloadsActivity"
+            android:exported="false"
+            android:label="تنزيلات تاجر"
+            android:theme="@style/Theme.Tager" />
+
+        <activity
             android:name=".TagerActivity"
             android:exported="true"
             android:launchMode="singleTask"
