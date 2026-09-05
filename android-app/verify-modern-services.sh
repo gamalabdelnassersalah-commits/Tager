@@ -96,7 +96,7 @@ grep -q 'android:name=".TagerSettingsActivity"' "$MANIFEST"
 grep -A10 'android:name=".TagerSettingsActivity"' "$MANIFEST" | grep -q 'android:exported="true"'
 grep -A10 'android:name=".TagerSettingsActivity"' "$MANIFEST" | grep -q 'android:scheme="tager" android:host="settings"'
 
-# Native download center stays Tager-scoped and metadata-only.
+# Native download center stays Tager-scoped, metadata-only, efficient and accessible.
 test -f "$DOWNLOADS"
 grep -q 'class TagerDownloadsActivity' "$DOWNLOADS"
 grep -q 'DownloadManager.Query' "$DOWNLOADS"
@@ -114,6 +114,10 @@ grep -q 'confirmDownloadRemoval' "$DOWNLOADS"
 grep -q 'downloadManager.remove' "$DOWNLOADS"
 grep -q 'scheduleActiveRefresh' "$DOWNLOADS"
 grep -q 'hasActiveDownloads' "$DOWNLOADS"
+grep -q 'ProgressBar' "$DOWNLOADS"
+grep -q 'progressBarStyleHorizontal' "$DOWNLOADS"
+grep -q 'progressPercent' "$DOWNLOADS"
+grep -q 'setContentDescription("تقدم التنزيل' "$DOWNLOADS"
 if grep -Eq 'COLUMN_URI|COLUMN_LOCAL_URI|CookieManager|getCookie\(' "$DOWNLOADS"; then
   echo 'Download center must not read source URLs or cookies' >&2
   exit 1
