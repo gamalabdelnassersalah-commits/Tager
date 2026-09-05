@@ -18,7 +18,7 @@ import com.google.android.play.core.install.model.UpdateAvailability;
 import java.lang.ref.WeakReference;
 
 final class TagerUpdateCoordinator {
-    private static final int UPDATE_REQUEST_CODE = 6202;
+    static final int UPDATE_REQUEST_CODE = 6202;
     private static final String PREFS = "tager_update_state";
     private static final String KEY_LAST_CHECK_AT = "last_check_at";
     private static final String KEY_UPDATE_LATER_AT = "update_later_at";
@@ -68,6 +68,24 @@ final class TagerUpdateCoordinator {
     void onActivityPaused(Activity activity) {
         Activity current = activityRef.get();
         if (current == activity) activityRef.clear();
+    }
+
+    boolean onActivityResult(int requestCode, int resultCode) {
+        if (requestCode != UPDATE_REQUEST_CODE) return false;
+        updateFlowStarted = false;
+        long now = System.currentTimeMillis();
+        SharedPreferences.Editor editor = preferences.edit();
+        if (resultCode == Activity.RESULT_OK) {
+            editor.remove(KEY_UPDATE_LATER_AT).putLong(KEY_LAST_CHECK_AT, now);
+        } else if (resultCode == Activity.RESULT_CANCELED) {
+            editor.putLong(KEY_UPDATE_LATER_AT, now);
+        } else {
+            // Treat interrupted/unknown Play responses conservatively and avoid
+            // immediately reopening the update flow on the next resume.
+            editor.putLong(KEY_UPDATE_LATER_AT, now);
+        }
+        editor.apply();
+        return true;
     }
 
     void shutdown() {
