@@ -1,10 +1,10 @@
 package com.tager.marketplace;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.IntentSender;
 import android.content.SharedPreferences;
-import android.widget.Toast;
 
 import com.google.android.play.core.appupdate.AppUpdateInfo;
 import com.google.android.play.core.appupdate.AppUpdateManager;
@@ -21,28 +21,28 @@ final class TagerUpdateCoordinator {
     private static final int UPDATE_REQUEST_CODE = 6202;
     private static final String PREFS = "tager_update_state";
     private static final String KEY_LAST_CHECK_AT = "last_check_at";
+    private static final String KEY_UPDATE_LATER_AT = "update_later_at";
+    private static final String KEY_INSTALL_LATER_AT = "install_later_at";
     private static final long CHECK_INTERVAL_MS = 6L * 60L * 60L * 1000L;
+    private static final long UPDATE_PROMPT_COOLDOWN_MS = 24L * 60L * 60L * 1000L;
+    private static final long INSTALL_PROMPT_COOLDOWN_MS = 6L * 60L * 60L * 1000L;
 
     private final AppUpdateManager updateManager;
     private final InstallStateUpdatedListener installListener;
     private final SharedPreferences preferences;
     private WeakReference<Activity> activityRef = new WeakReference<>(null);
     private boolean updateFlowStarted;
+    private boolean updatePromptVisible;
+    private boolean installPromptVisible;
 
     TagerUpdateCoordinator(TagerApplication application) {
         updateManager = AppUpdateManagerFactory.create(application);
         preferences = application.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         installListener = state -> {
-            if (state.installStatus() == InstallStatus.DOWNLOADED) {
-                Activity activity = activityRef.get();
-                if (activity != null && !activity.isFinishing()) {
-                    Toast.makeText(
-                            activity,
-                            "تم تنزيل تحديث تاجر — سيتم تثبيته الآن",
-                            Toast.LENGTH_LONG).show();
-                }
-                updateManager.completeUpdate();
-            }
+            if (state.installStatus() != InstallStatus.DOWNLOADED) return;
+            updateFlowStarted = false;
+            Activity activity = activityRef.get();
+            if (isUsable(activity)) showInstallReadyPrompt(activity, true);
         };
         updateManager.registerListener(installListener);
     }
@@ -54,9 +54,13 @@ final class TagerUpdateCoordinator {
             resumeUpdateIfNeeded(activity);
             return;
         }
+
         long now = System.currentTimeMillis();
         long lastCheck = preferences.getLong(KEY_LAST_CHECK_AT, 0L);
-        if (now - lastCheck < CHECK_INTERVAL_MS) return;
+        if (now - lastCheck < CHECK_INTERVAL_MS) {
+            checkDownloadedUpdate(activity);
+            return;
+        }
         preferences.edit().putLong(KEY_LAST_CHECK_AT, now).apply();
         checkForUpdate(activity);
     }
@@ -74,12 +78,24 @@ final class TagerUpdateCoordinator {
     private void checkForUpdate(Activity activity) {
         updateManager.getAppUpdateInfo()
                 .addOnSuccessListener(info -> {
-                    if (activity.isFinishing()) return;
+                    if (!isUsable(activity)) return;
+                    if (info.installStatus() == InstallStatus.DOWNLOADED) {
+                        showInstallReadyPrompt(activity, false);
+                        return;
+                    }
                     if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
                             && info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)) {
-                        startFlexibleUpdate(activity, info);
-                    } else if (info.installStatus() == InstallStatus.DOWNLOADED) {
-                        updateManager.completeUpdate();
+                        showUpdateAvailablePrompt(activity, info);
+                    }
+                });
+    }
+
+    private void checkDownloadedUpdate(Activity activity) {
+        updateManager.getAppUpdateInfo()
+                .addOnSuccessListener(info -> {
+                    if (!isUsable(activity)) return;
+                    if (info.installStatus() == InstallStatus.DOWNLOADED) {
+                        showInstallReadyPrompt(activity, false);
                     }
                 });
     }
@@ -87,25 +103,78 @@ final class TagerUpdateCoordinator {
     private void resumeUpdateIfNeeded(Activity activity) {
         updateManager.getAppUpdateInfo()
                 .addOnSuccessListener(info -> {
-                    if (activity.isFinishing()) return;
+                    if (!isUsable(activity)) return;
                     if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS
                             && info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)) {
                         startFlexibleUpdate(activity, info);
                     } else if (info.installStatus() == InstallStatus.DOWNLOADED) {
-                        updateManager.completeUpdate();
+                        updateFlowStarted = false;
+                        showInstallReadyPrompt(activity, false);
                     } else {
                         updateFlowStarted = false;
                     }
                 });
     }
 
+    private void showUpdateAvailablePrompt(Activity activity, AppUpdateInfo info) {
+        if (updatePromptVisible || updateFlowStarted || !isUsable(activity)) return;
+        long deferredAt = preferences.getLong(KEY_UPDATE_LATER_AT, 0L);
+        if (System.currentTimeMillis() - deferredAt < UPDATE_PROMPT_COOLDOWN_MS) return;
+
+        updatePromptVisible = true;
+        AlertDialog dialog = new AlertDialog.Builder(activity)
+                .setTitle("إصدار جديد من تاجر متاح")
+                .setMessage("يمكن تنزيل التحديث في الخلفية مع الاستمرار في استخدام التطبيق.")
+                .setPositiveButton("تحديث الآن", (ignored, which) -> startFlexibleUpdate(activity, info))
+                .setNegativeButton("لاحقًا", (ignored, which) -> preferences.edit()
+                        .putLong(KEY_UPDATE_LATER_AT, System.currentTimeMillis())
+                        .apply())
+                .create();
+        dialog.setOnDismissListener(ignored -> updatePromptVisible = false);
+        try {
+            dialog.show();
+        } catch (RuntimeException error) {
+            updatePromptVisible = false;
+        }
+    }
+
+    private void showInstallReadyPrompt(Activity activity, boolean ignoreCooldown) {
+        if (installPromptVisible || !isUsable(activity)) return;
+        long deferredAt = preferences.getLong(KEY_INSTALL_LATER_AT, 0L);
+        if (!ignoreCooldown
+                && System.currentTimeMillis() - deferredAt < INSTALL_PROMPT_COOLDOWN_MS) {
+            return;
+        }
+
+        installPromptVisible = true;
+        AlertDialog dialog = new AlertDialog.Builder(activity)
+                .setTitle("التحديث جاهز للتثبيت")
+                .setMessage("أعد تشغيل تاجر الآن لتثبيت الإصدار الجديد، أو أكمل عملك وثبته لاحقًا.")
+                .setPositiveButton("إعادة تشغيل وتثبيت", (ignored, which) -> {
+                    preferences.edit().remove(KEY_INSTALL_LATER_AT).apply();
+                    updateManager.completeUpdate();
+                })
+                .setNegativeButton("لاحقًا", (ignored, which) -> preferences.edit()
+                        .putLong(KEY_INSTALL_LATER_AT, System.currentTimeMillis())
+                        .apply())
+                .create();
+        dialog.setOnDismissListener(ignored -> installPromptVisible = false);
+        try {
+            dialog.show();
+        } catch (RuntimeException error) {
+            installPromptVisible = false;
+        }
+    }
+
     private void startFlexibleUpdate(Activity activity, AppUpdateInfo info) {
+        if (!isUsable(activity)) return;
         if (updateFlowStarted
                 && info.updateAvailability() != UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
             return;
         }
         try {
             updateFlowStarted = true;
+            preferences.edit().remove(KEY_UPDATE_LATER_AT).apply();
             updateManager.startUpdateFlowForResult(
                     info,
                     activity,
@@ -114,5 +183,9 @@ final class TagerUpdateCoordinator {
         } catch (IntentSender.SendIntentException | RuntimeException error) {
             updateFlowStarted = false;
         }
+    }
+
+    private boolean isUsable(Activity activity) {
+        return activity != null && !activity.isFinishing() && !activity.isDestroyed();
     }
 }
