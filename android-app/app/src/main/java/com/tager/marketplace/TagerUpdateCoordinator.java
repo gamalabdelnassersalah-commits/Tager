@@ -1,7 +1,9 @@
 package com.tager.marketplace;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.IntentSender;
+import android.content.SharedPreferences;
 import android.widget.Toast;
 
 import com.google.android.play.core.appupdate.AppUpdateInfo;
@@ -17,14 +19,19 @@ import java.lang.ref.WeakReference;
 
 final class TagerUpdateCoordinator {
     private static final int UPDATE_REQUEST_CODE = 6202;
+    private static final String PREFS = "tager_update_state";
+    private static final String KEY_LAST_CHECK_AT = "last_check_at";
+    private static final long CHECK_INTERVAL_MS = 6L * 60L * 60L * 1000L;
 
     private final AppUpdateManager updateManager;
     private final InstallStateUpdatedListener installListener;
+    private final SharedPreferences preferences;
     private WeakReference<Activity> activityRef = new WeakReference<>(null);
     private boolean updateFlowStarted;
 
     TagerUpdateCoordinator(TagerApplication application) {
         updateManager = AppUpdateManagerFactory.create(application);
+        preferences = application.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         installListener = state -> {
             if (state.installStatus() == InstallStatus.DOWNLOADED) {
                 Activity activity = activityRef.get();
@@ -47,6 +54,10 @@ final class TagerUpdateCoordinator {
             resumeUpdateIfNeeded(activity);
             return;
         }
+        long now = System.currentTimeMillis();
+        long lastCheck = preferences.getLong(KEY_LAST_CHECK_AT, 0L);
+        if (now - lastCheck < CHECK_INTERVAL_MS) return;
+        preferences.edit().putLong(KEY_LAST_CHECK_AT, now).apply();
         checkForUpdate(activity);
     }
 
@@ -82,6 +93,8 @@ final class TagerUpdateCoordinator {
                         startFlexibleUpdate(activity, info);
                     } else if (info.installStatus() == InstallStatus.DOWNLOADED) {
                         updateManager.completeUpdate();
+                    } else {
+                        updateFlowStarted = false;
                     }
                 });
     }
