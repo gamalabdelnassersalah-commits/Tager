@@ -54,6 +54,59 @@ final class TagerTrustedLinkPolicy {
         return null;
     }
 
+    static String withAndroidContext(String value, String appVersion) {
+        if (!isTrustedUrl(value)) return null;
+        String target = value.trim();
+        String safeVersion = sanitizeVersion(appVersion);
+
+        int fragmentIndex = target.indexOf('#');
+        String fragment = fragmentIndex >= 0 ? target.substring(fragmentIndex) : "";
+        String beforeFragment = fragmentIndex >= 0 ? target.substring(0, fragmentIndex) : target;
+
+        int queryIndex = beforeFragment.indexOf('?');
+        String rawQuery = queryIndex >= 0 ? beforeFragment.substring(queryIndex + 1) : "";
+        StringBuilder enriched = new StringBuilder(beforeFragment);
+
+        if (!hasRawQueryParameter(rawQuery, "tager_app")) {
+            appendRawQueryParameter(enriched, "tager_app", "android");
+            rawQuery = rawQuery.isEmpty() ? "tager_app=android" : rawQuery + "&tager_app=android";
+        }
+        if (!hasRawQueryParameter(rawQuery, "app_version")) {
+            appendRawQueryParameter(enriched, "app_version", safeVersion);
+        }
+        enriched.append(fragment);
+        String result = enriched.toString();
+        return isTrustedUrl(result) ? result : null;
+    }
+
+    private static void appendRawQueryParameter(StringBuilder target, String key, String value) {
+        int fragmentIndex = target.indexOf("#");
+        String current = fragmentIndex >= 0 ? target.substring(0, fragmentIndex) : target.toString();
+        if (current.indexOf('?') < 0) {
+            target.append('?');
+        } else if (!current.endsWith("?") && !current.endsWith("&")) {
+            target.append('&');
+        }
+        target.append(key).append('=').append(value);
+    }
+
+    private static boolean hasRawQueryParameter(String rawQuery, String expectedKey) {
+        if (rawQuery == null || rawQuery.isEmpty()) return false;
+        String[] parts = rawQuery.split("&", -1);
+        for (String part : parts) {
+            int equals = part.indexOf('=');
+            String key = equals >= 0 ? part.substring(0, equals) : part;
+            if (expectedKey.equals(key)) return true;
+        }
+        return false;
+    }
+
+    private static String sanitizeVersion(String value) {
+        if (value == null) return "unknown";
+        String safe = value.replaceAll("[^A-Za-z0-9._-]", "");
+        return safe.isEmpty() ? "unknown" : safe;
+    }
+
     private static boolean containsControlCharacter(String value) {
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);

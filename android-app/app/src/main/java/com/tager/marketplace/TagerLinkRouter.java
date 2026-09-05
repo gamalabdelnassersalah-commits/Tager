@@ -22,10 +22,12 @@ final class TagerLinkRouter {
         return trusted == null ? null : Uri.parse(trusted);
     }
 
-    static Intent buildOpenIntent(Context context, Uri trustedUrl) {
+    static Intent buildOpenIntent(Context context, Uri target) {
         Intent intent;
-        if (isTrustedProductionUrl(trustedUrl)) {
-            intent = new Intent(Intent.ACTION_VIEW, trustedUrl, context, TagerActivity.class);
+        if (isTrustedProductionUrl(target)) {
+            intent = new Intent(Intent.ACTION_VIEW, target, context, TagerDeepLinkActivity.class);
+        } else if (target != null && "tager".equalsIgnoreCase(target.getScheme())) {
+            intent = new Intent(Intent.ACTION_VIEW, target, context, TagerActivity.class);
         } else {
             intent = new Intent(context, TagerActivity.class);
         }

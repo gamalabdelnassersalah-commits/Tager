@@ -63,4 +63,25 @@ public class TagerTrustedLinkPolicyTest {
         assertFalse(TagerTrustedLinkPolicy.isTrustedUrl(huge.toString()));
         assertNull(TagerTrustedLinkPolicy.findTrustedUrl("لا يوجد رابط تاجر هنا"));
     }
+
+    @Test
+    public void addsAndroidContextWithoutDroppingProductIdentity() {
+        String source = "https://tager-new.vercel.app/product/P-123?ref=share#productDetails";
+        assertEquals(
+                "https://tager-new.vercel.app/product/P-123?ref=share&tager_app=android&app_version=2.2.0#productDetails",
+                TagerTrustedLinkPolicy.withAndroidContext(source, "2.2.0"));
+    }
+
+    @Test
+    public void doesNotDuplicateExistingAndroidContext() {
+        String source = "https://tager-new.vercel.app/?tager_app=android&app_version=2.1.1&id=88#orderDetails";
+        assertEquals(source, TagerTrustedLinkPolicy.withAndroidContext(source, "2.2.0"));
+    }
+
+    @Test
+    public void rejectsUntrustedTargetWhenAddingAndroidContext() {
+        assertNull(TagerTrustedLinkPolicy.withAndroidContext(
+                "https://tager-new.vercel.app.evil.example/?id=88#orderDetails",
+                "2.2.0"));
+    }
 }

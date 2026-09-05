@@ -107,8 +107,7 @@ final class TagerNotificationCenter {
         String safeMessage = message == null ? "" : message.trim();
         Uri safeTarget = target == null ? Uri.parse("tager://home") : target;
 
-        Intent open = new Intent(Intent.ACTION_VIEW, safeTarget, context, TagerActivity.class);
-        open.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        Intent open = TagerLinkRouter.buildOpenIntent(context, safeTarget);
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 context,
                 notificationId,
