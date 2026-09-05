@@ -34,6 +34,7 @@ final class TagerUpdateCoordinator {
     private boolean updateFlowStarted;
     private boolean updatePromptVisible;
     private boolean installPromptVisible;
+    private boolean updateCheckInProgress;
 
     TagerUpdateCoordinator(TagerApplication application) {
         updateManager = AppUpdateManagerFactory.create(application);
@@ -61,7 +62,6 @@ final class TagerUpdateCoordinator {
             checkDownloadedUpdate(activity);
             return;
         }
-        preferences.edit().putLong(KEY_LAST_CHECK_AT, now).apply();
         checkForUpdate(activity);
     }
 
@@ -77,11 +77,9 @@ final class TagerUpdateCoordinator {
         SharedPreferences.Editor editor = preferences.edit();
         if (resultCode == Activity.RESULT_OK) {
             editor.remove(KEY_UPDATE_LATER_AT).putLong(KEY_LAST_CHECK_AT, now);
-        } else if (resultCode == Activity.RESULT_CANCELED) {
-            editor.putLong(KEY_UPDATE_LATER_AT, now);
         } else {
-            // Treat interrupted/unknown Play responses conservatively and avoid
-            // immediately reopening the update flow on the next resume.
+            // User cancellation or an interrupted Play flow gets a prompt
+            // cooldown, without being treated as a successful update check.
             editor.putLong(KEY_UPDATE_LATER_AT, now);
         }
         editor.apply();
@@ -94,8 +92,12 @@ final class TagerUpdateCoordinator {
     }
 
     private void checkForUpdate(Activity activity) {
+        if (updateCheckInProgress) return;
+        updateCheckInProgress = true;
         updateManager.getAppUpdateInfo()
                 .addOnSuccessListener(info -> {
+                    updateCheckInProgress = false;
+                    preferences.edit().putLong(KEY_LAST_CHECK_AT, System.currentTimeMillis()).apply();
                     if (!isUsable(activity)) return;
                     if (info.installStatus() == InstallStatus.DOWNLOADED) {
                         showInstallReadyPrompt(activity, false);
@@ -105,7 +107,8 @@ final class TagerUpdateCoordinator {
                             && info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)) {
                         showUpdateAvailablePrompt(activity, info);
                     }
-                });
+                })
+                .addOnFailureListener(error -> updateCheckInProgress = false);
     }
 
     private void checkDownloadedUpdate(Activity activity) {
@@ -131,7 +134,8 @@ final class TagerUpdateCoordinator {
                     } else {
                         updateFlowStarted = false;
                     }
-                });
+                })
+                .addOnFailureListener(error -> updateFlowStarted = false);
     }
 
     private void showUpdateAvailablePrompt(Activity activity, AppUpdateInfo info) {
