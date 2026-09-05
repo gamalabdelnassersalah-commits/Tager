@@ -56,6 +56,8 @@ dependencies {
     implementation 'androidx.core:core:1.16.0'
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.2.0'
     implementation 'androidx.browser:browser:1.10.0'
+    implementation 'androidx.work:work-runtime:2.10.1'
+    implementation 'com.google.android.play:app-update:2.1.0'
 }
 
 static String sha256(File file) {
