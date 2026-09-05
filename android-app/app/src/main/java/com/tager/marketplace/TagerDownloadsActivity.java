@@ -1,6 +1,7 @@
 package com.tager.marketplace;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
@@ -260,10 +261,64 @@ public class TagerDownloadsActivity extends Activity {
             card.addView(fileActions, fileActionsParams);
         }
 
+        Button remove = new Button(this);
+        boolean active = isActive(item.status);
+        remove.setText(active ? "إلغاء التنزيل" : "حذف من التنزيلات");
+        remove.setAllCaps(false);
+        remove.setMinHeight(dp(48));
+        remove.setOnClickListener(v -> confirmDownloadRemoval(item));
+        LinearLayout.LayoutParams removeParams = new LinearLayout.LayoutParams(-1, dp(50));
+        removeParams.topMargin = dp(8);
+        card.addView(remove, removeParams);
+
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1, -2);
         cardParams.bottomMargin = dp(10);
         card.setLayoutParams(cardParams);
         return card;
+    }
+
+    private boolean isActive(int status) {
+        return status == DownloadManager.STATUS_RUNNING
+                || status == DownloadManager.STATUS_PENDING
+                || status == DownloadManager.STATUS_PAUSED;
+    }
+
+    private void confirmDownloadRemoval(DownloadItem item) {
+        if (item == null || downloadManager == null) return;
+        boolean active = isActive(item.status);
+        String title = active ? "إلغاء التنزيل؟" : "حذف التنزيل؟";
+        String message;
+        if (active) {
+            message = "سيتم إيقاف هذا التنزيل وإزالته من مدير تنزيلات Android.";
+        } else if (item.status == DownloadManager.STATUS_SUCCESSFUL) {
+            message = "سيتم حذف الملف من الجهاز وإزالته من سجل تنزيلات تاجر. لا يمكن التراجع عن ذلك.";
+        } else {
+            message = "سيتم إزالة هذا السجل من تنزيلات تاجر.";
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton(active ? "إلغاء التنزيل" : "حذف", (dialog, which) -> removeDownload(item))
+                .setNegativeButton("رجوع", null)
+                .show();
+    }
+
+    private void removeDownload(DownloadItem item) {
+        if (downloadManager == null || item == null) return;
+        try {
+            int removed = downloadManager.remove(item.id);
+            if (removed > 0) {
+                Toast.makeText(this,
+                        isActive(item.status) ? "تم إلغاء التنزيل" : "تم حذف التنزيل",
+                        Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "التنزيل لم يعد موجودًا", Toast.LENGTH_SHORT).show();
+            }
+            refreshDownloads();
+        } catch (SecurityException | RuntimeException error) {
+            Toast.makeText(this, "تعذر حذف هذا التنزيل", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private String statusText(DownloadItem item) {
