@@ -13,6 +13,9 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -41,6 +44,7 @@ public class TagerSettingsActivity extends Activity {
     private TextView notificationStatus;
     private TextView channelStatus;
     private TextView runtimeStatus;
+    private TextView networkStatus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,6 +59,7 @@ public class TagerSettingsActivity extends Activity {
         super.onResume();
         refreshNotificationStatus();
         refreshRuntimeStatus();
+        refreshNetworkStatus();
     }
 
     private View buildContent() {
@@ -86,6 +91,7 @@ public class TagerSettingsActivity extends Activity {
         root.addView(subtitle, subtitleParams);
 
         root.addView(buildNotificationCard());
+        root.addView(buildNetworkHealthCard());
         root.addView(buildRuntimeHealthCard());
         root.addView(buildAppInfoCard());
         root.addView(buildActionsCard());
@@ -136,6 +142,29 @@ public class TagerSettingsActivity extends Activity {
         Button settings = actionButton("كل إعدادات إشعارات Android");
         settings.setOnClickListener(v -> openNotificationSettings());
         addButton(card, settings);
+        return card;
+    }
+
+    private View buildNetworkHealthCard() {
+        LinearLayout card = newCard();
+        card.addView(heading("حالة الشبكة"));
+
+        networkStatus = new TextView(this);
+        networkStatus.setText("جاري فحص اتصال الشبكة…");
+        networkStatus.setTextSize(14f);
+        networkStatus.setTextColor(getColor(R.color.tager_text_muted));
+        networkStatus.setLineSpacing(0f, 1.2f);
+        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(-1, -2);
+        statusParams.topMargin = dp(7);
+        card.addView(networkStatus, statusParams);
+
+        TextView privacy = new TextView(this);
+        privacy.setText("الفحص محلي فقط ولا يقرأ IP أو اسم Wi‑Fi أو الموقع أو أي معرف للجهاز.");
+        privacy.setTextSize(12f);
+        privacy.setTextColor(getColor(R.color.tager_text_muted));
+        LinearLayout.LayoutParams privacyParams = new LinearLayout.LayoutParams(-1, -2);
+        privacyParams.topMargin = dp(7);
+        card.addView(privacy, privacyParams);
         return card;
     }
 
@@ -314,6 +343,7 @@ public class TagerSettingsActivity extends Activity {
         boolean notificationsEnabled = permissionGranted
                 && NotificationManagerCompat.from(this).areNotificationsEnabled();
         TagerCrashRecorder.Snapshot runtime = TagerCrashRecorder.snapshot(this);
+        NetworkHealth network = readNetworkHealth();
 
         StringBuilder report = new StringBuilder();
         report.append("Tager Android diagnostics")
@@ -337,10 +367,14 @@ public class TagerSettingsActivity extends Activity {
                 report.append("\nWebView: unavailable");
             }
         }
+        report.append("\nNetwork: connected=").append(network.connected)
+                .append(", validated=").append(network.validated)
+                .append(", metered=").append(network.metered)
+                .append(", transport=").append(network.transport);
         report.append("\nRuntime health: crashes=").append(runtime.crashCount)
                 .append(", last_crash_at=").append(runtime.lastCrashAt)
                 .append(", version=").append(runtime.version);
-        report.append("\nPrivacy: no account, URL, cookie, device ID, crash message or crash stack included");
+        report.append("\nPrivacy: no account, URL, cookie, IP, Wi-Fi name, location, device ID, crash message or crash stack included");
         return report.toString();
     }
 
@@ -379,6 +413,59 @@ public class TagerSettingsActivity extends Activity {
         channelStatus.setText("الطلبات: " + channelLabel(TagerApplication.CHANNEL_ORDERS)
                 + "  •  الرسائل: " + channelLabel(TagerApplication.CHANNEL_MESSAGES)
                 + "  •  التنزيلات: " + channelLabel(TagerApplication.CHANNEL_DOWNLOADS));
+    }
+
+    private void refreshNetworkStatus() {
+        if (networkStatus == null) return;
+        NetworkHealth network = readNetworkHealth();
+        if (!network.connected) {
+            networkStatus.setText("الحالة: غير متصل — لا توجد شبكة نشطة متاحة لتاجر حاليًا.");
+            networkStatus.setTextColor(getColor(R.color.tager_orange));
+            return;
+        }
+        String validation = network.validated
+                ? "تم التحقق من وصول الإنترنت"
+                : "الشبكة موجودة لكن Android لم يتحقق من وصول الإنترنت";
+        networkStatus.setText("الحالة: متصل — " + transportArabic(network.transport)
+                + "\nالإنترنت: " + validation
+                + "\nاتصال محسوب (Metered): " + (network.metered ? "نعم" : "لا"));
+        networkStatus.setTextColor(getColor(network.validated ? R.color.tager_teal : R.color.tager_orange));
+    }
+
+    private NetworkHealth readNetworkHealth() {
+        try {
+            ConnectivityManager manager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (manager == null) return NetworkHealth.offline();
+            Network active = manager.getActiveNetwork();
+            if (active == null) return NetworkHealth.offline();
+            NetworkCapabilities capabilities = manager.getNetworkCapabilities(active);
+            if (capabilities == null) return NetworkHealth.offline();
+
+            boolean connected = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+            boolean validated = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
+            boolean metered = manager.isActiveNetworkMetered();
+            return new NetworkHealth(connected, validated, metered, detectTransport(capabilities));
+        } catch (RuntimeException ignored) {
+            return NetworkHealth.offline();
+        }
+    }
+
+    private String detectTransport(NetworkCapabilities capabilities) {
+        if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) return "wifi";
+        if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) return "cellular";
+        if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) return "ethernet";
+        if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) return "vpn";
+        if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH)) return "bluetooth";
+        return "other";
+    }
+
+    private String transportArabic(String transport) {
+        if ("wifi".equals(transport)) return "Wi‑Fi";
+        if ("cellular".equals(transport)) return "بيانات الجوال";
+        if ("ethernet".equals(transport)) return "Ethernet";
+        if ("vpn".equals(transport)) return "VPN";
+        if ("bluetooth".equals(transport)) return "Bluetooth";
+        return "شبكة أخرى";
     }
 
     private void refreshRuntimeStatus() {
@@ -476,5 +563,23 @@ public class TagerSettingsActivity extends Activity {
 
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private static final class NetworkHealth {
+        final boolean connected;
+        final boolean validated;
+        final boolean metered;
+        final String transport;
+
+        NetworkHealth(boolean connected, boolean validated, boolean metered, String transport) {
+            this.connected = connected;
+            this.validated = validated;
+            this.metered = metered;
+            this.transport = transport == null ? "other" : transport;
+        }
+
+        static NetworkHealth offline() {
+            return new NetworkHealth(false, false, false, "none");
+        }
     }
 }
