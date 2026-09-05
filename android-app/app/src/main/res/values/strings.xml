@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tager | تاجر</string>
+    <string name="shortcut_products_short">المنتجات</string>
+    <string name="shortcut_products_long">تصفح منتجات تاجر</string>
+    <string name="shortcut_track_short">تتبع الطلب</string>
+    <string name="shortcut_track_long">متابعة حالة الطلب</string>
+    <string name="shortcut_cart_short">السلة</string>
+    <string name="shortcut_cart_long">فتح سلة المشتريات</string>
+</resources>
