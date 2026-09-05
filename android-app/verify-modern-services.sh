@@ -80,6 +80,9 @@ grep -q 'ACTION_APP_NOTIFICATION_SETTINGS' "$SETTINGS"
 grep -q 'ACTION_APPLICATION_DETAILS_SETTINGS' "$SETTINGS"
 grep -q 'getCurrentWebViewPackage' "$SETTINGS"
 grep -q 'TagerDownloadsActivity.class' "$SETTINGS"
+grep -q 'testNotification' "$SETTINGS"
+grep -q 'showMessageNotification' "$SETTINGS"
+grep -q 'TEST_NOTIFICATION_ID' "$SETTINGS"
 grep -q 'android:name=".TagerSettingsActivity"' "$MANIFEST"
 grep -A10 'android:name=".TagerSettingsActivity"' "$MANIFEST" | grep -q 'android:exported="true"'
 grep -A10 'android:name=".TagerSettingsActivity"' "$MANIFEST" | grep -q 'android:scheme="tager" android:host="settings"'
