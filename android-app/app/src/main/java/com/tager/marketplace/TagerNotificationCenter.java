@@ -1,6 +1,8 @@
 package com.tager.marketplace;
 
 import android.Manifest;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
@@ -23,6 +25,16 @@ final class TagerNotificationCenter {
             return false;
         }
         return NotificationManagerCompat.from(context).areNotificationsEnabled();
+    }
+
+    static boolean canNotifyChannel(Context context, String channelId) {
+        if (!canNotify(context)) return false;
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true;
+        if (channelId == null || channelId.trim().isEmpty()) return false;
+        NotificationManager manager = context.getSystemService(NotificationManager.class);
+        if (manager == null) return false;
+        NotificationChannel channel = manager.getNotificationChannel(channelId);
+        return channel != null && channel.getImportance() != NotificationManager.IMPORTANCE_NONE;
     }
 
     static void showOrderNotification(Context context, int notificationId, String title, String message, String page) {
@@ -55,7 +67,7 @@ final class TagerNotificationCenter {
             String message,
             String page,
             int priority) {
-        if (!canNotify(context)) return;
+        if (!canNotifyChannel(context, channelId)) return;
 
         String safeTitle = title == null || title.trim().isEmpty() ? "Tager | تاجر" : title.trim();
         String safeMessage = message == null ? "" : message.trim();
@@ -83,7 +95,7 @@ final class TagerNotificationCenter {
         try {
             NotificationManagerCompat.from(context).notify(notificationId, builder.build());
         } catch (SecurityException ignored) {
-            // Permission can be revoked between canNotify() and notify().
+            // Permission or channel state can change between validation and notify().
             // Failing closed keeps notification delivery safe without crashing Tager.
         }
     }
