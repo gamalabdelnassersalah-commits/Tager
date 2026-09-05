@@ -44,4 +44,16 @@
             android:targetPackage="com.tager.marketplace"
             android:targetClass="com.tager.marketplace.TagerDownloadsActivity" />
     </shortcut>
+
+    <shortcut
+        android:shortcutId="settings"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_settings"
+        android:shortcutShortLabel="@string/shortcut_settings_short"
+        android:shortcutLongLabel="@string/shortcut_settings_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.tager.marketplace"
+            android:targetClass="com.tager.marketplace.TagerSettingsActivity" />
+    </shortcut>
 </shortcuts>
