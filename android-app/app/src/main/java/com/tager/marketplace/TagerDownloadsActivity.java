@@ -27,19 +27,14 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * Native download center for files downloaded by Tager through Android's
- * DownloadManager. It never reads source URLs, cookies, account data or file
- * contents, and only presents rows carrying Tager's own download marker.
- */
+/** Native, privacy-scoped download center for files started by Tager. */
 public class TagerDownloadsActivity extends Activity {
     private static final String TAGER_DOWNLOAD_MARKER = "Tager | تاجر";
     private static final long AUTO_REFRESH_MS = 2000L;
 
     private final Handler refreshHandler = new Handler(Looper.getMainLooper());
     private final Runnable autoRefresh = new Runnable() {
-        @Override
-        public void run() {
+        @Override public void run() {
             refreshDownloads();
             refreshHandler.postDelayed(this, AUTO_REFRESH_MS);
         }
@@ -49,8 +44,7 @@ public class TagerDownloadsActivity extends Activity {
     private LinearLayout listContainer;
     private TextView summaryView;
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         downloadManager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
         getWindow().setStatusBarColor(getColor(R.color.tager_teal_dark));
@@ -59,22 +53,19 @@ public class TagerDownloadsActivity extends Activity {
         refreshDownloads();
     }
 
-    @Override
-    protected void onResume() {
+    @Override protected void onResume() {
         super.onResume();
         refreshDownloads();
         refreshHandler.removeCallbacks(autoRefresh);
         refreshHandler.postDelayed(autoRefresh, AUTO_REFRESH_MS);
     }
 
-    @Override
-    protected void onPause() {
+    @Override protected void onPause() {
         refreshHandler.removeCallbacks(autoRefresh);
         super.onPause();
     }
 
-    @Override
-    protected void onDestroy() {
+    @Override protected void onDestroy() {
         refreshHandler.removeCallbacksAndMessages(null);
         super.onDestroy();
     }
@@ -91,24 +82,18 @@ public class TagerDownloadsActivity extends Activity {
         title.setTextSize(24f);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         title.setTextColor(getColor(R.color.tager_teal_dark));
-        title.setGravity(Gravity.START);
-        root.addView(title, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
+        root.addView(title);
 
         summaryView = new TextView(this);
         summaryView.setText("جاري قراءة التنزيلات…");
         summaryView.setTextSize(14f);
         summaryView.setTextColor(getColor(R.color.tager_text_muted));
-        LinearLayout.LayoutParams summaryParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT);
+        LinearLayout.LayoutParams summaryParams = new LinearLayout.LayoutParams(-1, -2);
         summaryParams.topMargin = dp(6);
         root.addView(summaryView, summaryParams);
 
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.setGravity(Gravity.START);
         actions.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
 
         Button refresh = new Button(this);
@@ -127,9 +112,7 @@ public class TagerDownloadsActivity extends Activity {
         folderParams.setMarginStart(dp(8));
         actions.addView(openFolder, folderParams);
 
-        LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT);
+        LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(-1, -2);
         actionsParams.topMargin = dp(12);
         root.addView(actions, actionsParams);
 
@@ -138,14 +121,8 @@ public class TagerDownloadsActivity extends Activity {
         listContainer = new LinearLayout(this);
         listContainer.setOrientation(LinearLayout.VERTICAL);
         listContainer.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        scroll.addView(listContainer, new ScrollView.LayoutParams(
-                ScrollView.LayoutParams.MATCH_PARENT,
-                ScrollView.LayoutParams.WRAP_CONTENT));
-
-        LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f);
+        scroll.addView(listContainer, new ScrollView.LayoutParams(-1, -2));
+        LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(-1, 0, 1f);
         scrollParams.topMargin = dp(12);
         root.addView(scroll, scrollParams);
         return root;
@@ -154,7 +131,6 @@ public class TagerDownloadsActivity extends Activity {
     private void refreshDownloads() {
         if (listContainer == null) return;
         listContainer.removeAllViews();
-
         List<DownloadItem> items = loadDownloads();
         if (items.isEmpty()) {
             summaryView.setText("لا توجد تنزيلات من تاجر حتى الآن");
@@ -168,9 +144,7 @@ public class TagerDownloadsActivity extends Activity {
             return;
         }
 
-        int active = 0;
-        int complete = 0;
-        int failed = 0;
+        int active = 0, complete = 0, failed = 0;
         for (DownloadItem item : items) {
             if (item.status == DownloadManager.STATUS_RUNNING
                     || item.status == DownloadManager.STATUS_PENDING
@@ -179,19 +153,15 @@ public class TagerDownloadsActivity extends Activity {
             else if (item.status == DownloadManager.STATUS_FAILED) failed++;
             listContainer.addView(buildDownloadRow(item));
         }
-        summaryView.setText("الكل: " + items.size()
-                + "  •  جاري: " + active
-                + "  •  مكتمل: " + complete
-                + (failed > 0 ? "  •  فشل: " + failed : ""));
+        summaryView.setText("الكل: " + items.size() + "  •  جاري: " + active
+                + "  •  مكتمل: " + complete + (failed > 0 ? "  •  فشل: " + failed : ""));
     }
 
     private List<DownloadItem> loadDownloads() {
         if (downloadManager == null) return Collections.emptyList();
         ArrayList<DownloadItem> items = new ArrayList<>();
-        int allStatuses = DownloadManager.STATUS_PENDING
-                | DownloadManager.STATUS_RUNNING
-                | DownloadManager.STATUS_PAUSED
-                | DownloadManager.STATUS_SUCCESSFUL
+        int allStatuses = DownloadManager.STATUS_PENDING | DownloadManager.STATUS_RUNNING
+                | DownloadManager.STATUS_PAUSED | DownloadManager.STATUS_SUCCESSFUL
                 | DownloadManager.STATUS_FAILED;
         DownloadManager.Query query = new DownloadManager.Query().setFilterByStatus(allStatuses);
 
@@ -208,9 +178,7 @@ public class TagerDownloadsActivity extends Activity {
 
             while (cursor.moveToNext()) {
                 if (idCol < 0 || statusCol < 0 || descriptionCol < 0) continue;
-                String description = cursor.getString(descriptionCol);
-                if (!TAGER_DOWNLOAD_MARKER.equals(description)) continue;
-
+                if (!TAGER_DOWNLOAD_MARKER.equals(cursor.getString(descriptionCol))) continue;
                 DownloadItem item = new DownloadItem();
                 item.id = cursor.getLong(idCol);
                 item.title = titleCol >= 0 ? cursor.getString(titleCol) : null;
@@ -224,7 +192,6 @@ public class TagerDownloadsActivity extends Activity {
         } catch (RuntimeException ignored) {
             return Collections.emptyList();
         }
-
         Collections.sort(items, (left, right) -> Long.compare(right.modifiedAt, left.modifiedAt));
         return items;
     }
@@ -234,7 +201,6 @@ public class TagerDownloadsActivity extends Activity {
         card.setOrientation(LinearLayout.VERTICAL);
         card.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         card.setPadding(dp(14), dp(12), dp(14), dp(12));
-
         GradientDrawable background = new GradientDrawable();
         background.setColor(getColor(R.color.white));
         background.setCornerRadius(dp(14));
@@ -242,10 +208,7 @@ public class TagerDownloadsActivity extends Activity {
         card.setBackground(background);
 
         TextView title = new TextView(this);
-        String safeTitle = item.title == null || item.title.trim().isEmpty()
-                ? "ملف من تاجر"
-                : item.title.trim();
-        title.setText(safeTitle);
+        title.setText(item.title == null || item.title.trim().isEmpty() ? "ملف من تاجر" : item.title.trim());
         title.setTextSize(16f);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         title.setTextColor(getColor(R.color.tager_teal_dark));
@@ -256,43 +219,46 @@ public class TagerDownloadsActivity extends Activity {
         status.setText(statusText(item));
         status.setTextSize(14f);
         status.setTextColor(statusColor(item.status));
-        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT);
+        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(-1, -2);
         statusParams.topMargin = dp(5);
         card.addView(status, statusParams);
 
         if (item.modifiedAt > 0L) {
             TextView date = new TextView(this);
-            date.setText(DateFormat.getDateTimeInstance(
-                    DateFormat.MEDIUM,
-                    DateFormat.SHORT,
+            date.setText(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT,
                     Locale.getDefault()).format(new Date(item.modifiedAt)));
             date.setTextSize(12f);
             date.setTextColor(getColor(R.color.tager_text_muted));
-            LinearLayout.LayoutParams dateParams = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT);
-            dateParams.topMargin = dp(4);
-            card.addView(date, dateParams);
+            card.addView(date);
         }
 
         if (item.status == DownloadManager.STATUS_SUCCESSFUL) {
+            LinearLayout fileActions = new LinearLayout(this);
+            fileActions.setOrientation(LinearLayout.HORIZONTAL);
+            fileActions.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+
             Button open = new Button(this);
             open.setText("فتح الملف");
             open.setAllCaps(false);
             open.setMinHeight(dp(48));
             open.setOnClickListener(v -> openDownloadedFile(item));
-            LinearLayout.LayoutParams openParams = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    dp(50));
-            openParams.topMargin = dp(8);
-            card.addView(open, openParams);
+            fileActions.addView(open, new LinearLayout.LayoutParams(0, dp(50), 1f));
+
+            Button share = new Button(this);
+            share.setText("مشاركة");
+            share.setAllCaps(false);
+            share.setMinHeight(dp(48));
+            share.setOnClickListener(v -> shareDownloadedFile(item));
+            LinearLayout.LayoutParams shareParams = new LinearLayout.LayoutParams(0, dp(50), 1f);
+            shareParams.setMarginStart(dp(8));
+            fileActions.addView(share, shareParams);
+
+            LinearLayout.LayoutParams fileActionsParams = new LinearLayout.LayoutParams(-1, -2);
+            fileActionsParams.topMargin = dp(8);
+            card.addView(fileActions, fileActionsParams);
         }
 
-        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT);
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1, -2);
         cardParams.bottomMargin = dp(10);
         card.setLayoutParams(cardParams);
         return card;
@@ -300,23 +266,20 @@ public class TagerDownloadsActivity extends Activity {
 
     private String statusText(DownloadItem item) {
         switch (item.status) {
-            case DownloadManager.STATUS_PENDING:
-                return "في انتظار بدء التنزيل";
+            case DownloadManager.STATUS_PENDING: return "في انتظار بدء التنزيل";
             case DownloadManager.STATUS_RUNNING:
                 if (item.totalBytes > 0L && item.currentBytes >= 0L) {
                     long percent = Math.min(100L, (item.currentBytes * 100L) / item.totalBytes);
-                    return "جاري التنزيل — " + percent + "%  •  "
-                            + formatBytes(item.currentBytes) + " / " + formatBytes(item.totalBytes);
+                    return "جاري التنزيل — " + percent + "%  •  " + formatBytes(item.currentBytes)
+                            + " / " + formatBytes(item.totalBytes);
                 }
                 return "جاري التنزيل";
-            case DownloadManager.STATUS_PAUSED:
-                return "التنزيل متوقف مؤقتًا";
+            case DownloadManager.STATUS_PAUSED: return "التنزيل متوقف مؤقتًا";
             case DownloadManager.STATUS_SUCCESSFUL:
                 return "مكتمل" + (item.totalBytes > 0L ? "  •  " + formatBytes(item.totalBytes) : "");
             case DownloadManager.STATUS_FAILED:
                 return "فشل التنزيل — يمكنك إعادة المحاولة من صفحة الملف في تاجر";
-            default:
-                return "حالة غير معروفة";
+            default: return "حالة غير معروفة";
         }
     }
 
@@ -327,28 +290,44 @@ public class TagerDownloadsActivity extends Activity {
     }
 
     private void openDownloadedFile(DownloadItem item) {
-        if (downloadManager == null || item == null) return;
-        Uri uri = downloadManager.getUriForDownloadedFile(item.id);
-        if (uri == null) {
-            Toast.makeText(this, "الملف لم يعد متاحًا في التنزيلات", Toast.LENGTH_SHORT).show();
-            refreshDownloads();
-            return;
-        }
-
-        String mime = item.mimeType;
-        if (mime == null || mime.trim().isEmpty()) {
-            mime = downloadManager.getMimeTypeForDownloadedFile(item.id);
-        }
-        if (mime == null || mime.trim().isEmpty()) mime = "*/*";
-
-        Intent open = new Intent(Intent.ACTION_VIEW);
-        open.setDataAndType(uri, mime);
-        open.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        DownloadHandle handle = resolveDownload(item);
+        if (handle == null) return;
+        Intent open = new Intent(Intent.ACTION_VIEW)
+                .setDataAndType(handle.uri, handle.mimeType)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         try {
             startActivity(open);
         } catch (ActivityNotFoundException | SecurityException error) {
             Toast.makeText(this, "لا يوجد تطبيق مناسب لفتح هذا الملف", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void shareDownloadedFile(DownloadItem item) {
+        DownloadHandle handle = resolveDownload(item);
+        if (handle == null) return;
+        Intent share = new Intent(Intent.ACTION_SEND);
+        share.setType(handle.mimeType);
+        share.putExtra(Intent.EXTRA_STREAM, handle.uri);
+        share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        try {
+            startActivity(Intent.createChooser(share, "مشاركة ملف من تاجر"));
+        } catch (ActivityNotFoundException | SecurityException error) {
+            Toast.makeText(this, "لا يوجد تطبيق مناسب لمشاركة هذا الملف", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private DownloadHandle resolveDownload(DownloadItem item) {
+        if (downloadManager == null || item == null) return null;
+        Uri uri = downloadManager.getUriForDownloadedFile(item.id);
+        if (uri == null) {
+            Toast.makeText(this, "الملف لم يعد متاحًا في التنزيلات", Toast.LENGTH_SHORT).show();
+            refreshDownloads();
+            return null;
+        }
+        String mime = item.mimeType;
+        if (mime == null || mime.trim().isEmpty()) mime = downloadManager.getMimeTypeForDownloadedFile(item.id);
+        if (mime == null || mime.trim().isEmpty()) mime = "*/*";
+        return new DownloadHandle(uri, mime);
     }
 
     private void openSystemDownloads() {
@@ -369,9 +348,7 @@ public class TagerDownloadsActivity extends Activity {
         return String.format(Locale.getDefault(), "%.2f GB", mb / 1024d);
     }
 
-    private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
-    }
+    private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
 
     private static final class DownloadItem {
         long id;
@@ -381,5 +358,14 @@ public class TagerDownloadsActivity extends Activity {
         long currentBytes;
         long totalBytes;
         long modifiedAt;
+    }
+
+    private static final class DownloadHandle {
+        final Uri uri;
+        final String mimeType;
+        DownloadHandle(Uri uri, String mimeType) {
+            this.uri = uri;
+            this.mimeType = mimeType;
+        }
     }
 }
