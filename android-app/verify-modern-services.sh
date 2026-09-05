@@ -8,9 +8,11 @@ UPDATE="app/src/main/java/com/tager/marketplace/TagerUpdateCoordinator.java"
 NOTIFY="app/src/main/java/com/tager/marketplace/TagerNotificationCenter.java"
 WORKER="app/src/main/java/com/tager/marketplace/TagerMaintenanceWorker.java"
 CRASH="app/src/main/java/com/tager/marketplace/TagerCrashRecorder.java"
+DOWNLOADS="app/src/main/java/com/tager/marketplace/TagerDownloadsActivity.java"
 SHORTCUTS="app/src/main/res/xml/shortcuts.xml"
 ACTIVITY="app/src/main/java/com/tager/marketplace/TagerActivity.java"
 NOTIFICATION_ICON="app/src/main/res/drawable/ic_notification_tager.xml"
+DOWNLOAD_ICON="app/src/main/res/drawable/ic_shortcut_downloads.xml"
 
 # Core native dependencies and external navigation protection.
 grep -q "androidx.browser:browser:1.10.0" "$BUILD"
@@ -54,6 +56,16 @@ grep -q 'tager://' "$NOTIFY"
 grep -q 'ic_notification_tager' "$NOTIFY"
 test -f "$NOTIFICATION_ICON"
 
+# Native download center must stay app-private and use DownloadManager only.
+test -f "$DOWNLOADS"
+grep -q 'class TagerDownloadsActivity' "$DOWNLOADS"
+grep -q 'DownloadManager.Query' "$DOWNLOADS"
+grep -q 'getUriForDownloadedFile' "$DOWNLOADS"
+grep -q 'ACTION_VIEW_DOWNLOADS' "$DOWNLOADS"
+grep -q 'android:name=".TagerDownloadsActivity"' "$MANIFEST"
+grep -A4 'android:name=".TagerDownloadsActivity"' "$MANIFEST" | grep -q 'android:exported="false"'
+test -f "$DOWNLOAD_ICON"
+
 # Native launcher shortcuts and deep-link routing.
 grep -q 'android.app.shortcuts' "$MANIFEST"
 grep -q '@xml/shortcuts' "$MANIFEST"
@@ -61,6 +73,8 @@ for page in products track cart; do
   grep -q "android:shortcutId=\"$page\"" "$SHORTCUTS"
   grep -q "android:data=\"tager://$page\"" "$SHORTCUTS"
 done
+grep -q 'android:shortcutId="downloads"' "$SHORTCUTS"
+grep -q 'TagerDownloadsActivity' "$SHORTCUTS"
 
 # Keep one native refresh implementation; prevent the old touch-listener path.
 grep -q 'TagerSwipeRefreshLayout' 'app/src/main/res/layout/activity_main.xml'
