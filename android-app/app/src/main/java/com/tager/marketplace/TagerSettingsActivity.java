@@ -45,6 +45,7 @@ public class TagerSettingsActivity extends Activity {
     private TextView channelStatus;
     private TextView runtimeStatus;
     private TextView networkStatus;
+    private TextView webViewStatus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,6 +61,7 @@ public class TagerSettingsActivity extends Activity {
         refreshNotificationStatus();
         refreshRuntimeStatus();
         refreshNetworkStatus();
+        refreshWebViewStatus();
     }
 
     private View buildContent() {
@@ -92,6 +94,7 @@ public class TagerSettingsActivity extends Activity {
 
         root.addView(buildNotificationCard());
         root.addView(buildNetworkHealthCard());
+        root.addView(buildWebViewHealthCard());
         root.addView(buildRuntimeHealthCard());
         root.addView(buildAppInfoCard());
         root.addView(buildActionsCard());
@@ -165,6 +168,25 @@ public class TagerSettingsActivity extends Activity {
         LinearLayout.LayoutParams privacyParams = new LinearLayout.LayoutParams(-1, -2);
         privacyParams.topMargin = dp(7);
         card.addView(privacy, privacyParams);
+        return card;
+    }
+
+    private View buildWebViewHealthCard() {
+        LinearLayout card = newCard();
+        card.addView(heading("محرك عرض التطبيق"));
+
+        webViewStatus = new TextView(this);
+        webViewStatus.setText("جاري قراءة إصدار Android WebView…");
+        webViewStatus.setTextSize(14f);
+        webViewStatus.setTextColor(getColor(R.color.tager_text_muted));
+        webViewStatus.setLineSpacing(0f, 1.2f);
+        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(-1, -2);
+        statusParams.topMargin = dp(7);
+        card.addView(webViewStatus, statusParams);
+
+        Button providerSettings = actionButton("فتح إعدادات WebView الحالية");
+        providerSettings.setOnClickListener(v -> openCurrentWebViewSettings());
+        addButton(card, providerSettings);
         return card;
     }
 
@@ -344,6 +366,7 @@ public class TagerSettingsActivity extends Activity {
                 && NotificationManagerCompat.from(this).areNotificationsEnabled();
         TagerCrashRecorder.Snapshot runtime = TagerCrashRecorder.snapshot(this);
         NetworkHealth network = readNetworkHealth();
+        PackageInfo webView = currentWebViewPackage();
 
         StringBuilder report = new StringBuilder();
         report.append("Tager Android diagnostics")
@@ -357,15 +380,12 @@ public class TagerSettingsActivity extends Activity {
             report.append("\nChannels: orders=").append(channelEnabled(TagerApplication.CHANNEL_ORDERS))
                     .append(", messages=").append(channelEnabled(TagerApplication.CHANNEL_MESSAGES))
                     .append(", downloads=").append(channelEnabled(TagerApplication.CHANNEL_DOWNLOADS));
-            try {
-                PackageInfo webView = WebView.getCurrentWebViewPackage();
-                if (webView != null) {
-                    report.append("\nWebView: ").append(webView.packageName)
-                            .append(" ").append(webView.versionName == null ? "" : webView.versionName);
-                }
-            } catch (RuntimeException ignored) {
-                report.append("\nWebView: unavailable");
-            }
+        }
+        if (webView != null) {
+            report.append("\nWebView: ").append(webView.packageName)
+                    .append(" ").append(webView.versionName == null ? "" : webView.versionName);
+        } else {
+            report.append("\nWebView: unavailable");
         }
         report.append("\nNetwork: connected=").append(network.connected)
                 .append(", validated=").append(network.validated)
@@ -430,6 +450,46 @@ public class TagerSettingsActivity extends Activity {
                 + "\nالإنترنت: " + validation
                 + "\nاتصال محسوب (Metered): " + (network.metered ? "نعم" : "لا"));
         networkStatus.setTextColor(getColor(network.validated ? R.color.tager_teal : R.color.tager_orange));
+    }
+
+    private void refreshWebViewStatus() {
+        if (webViewStatus == null) return;
+        PackageInfo webView = currentWebViewPackage();
+        if (webView == null) {
+            webViewStatus.setText("الحالة: تعذر تحديد مزود Android WebView الحالي على هذا الجهاز.");
+            webViewStatus.setTextColor(getColor(R.color.tager_orange));
+            return;
+        }
+        String version = webView.versionName == null || webView.versionName.trim().isEmpty()
+                ? "غير معروف" : webView.versionName;
+        webViewStatus.setText("الحالة: متاح\nالمزود: " + webView.packageName
+                + "\nالإصدار: " + version);
+        webViewStatus.setTextColor(getColor(R.color.tager_teal));
+    }
+
+    private PackageInfo currentWebViewPackage() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null;
+        try {
+            return WebView.getCurrentWebViewPackage();
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private void openCurrentWebViewSettings() {
+        PackageInfo webView = currentWebViewPackage();
+        if (webView == null || webView.packageName == null || webView.packageName.trim().isEmpty()) {
+            Toast.makeText(this, "تعذر تحديد تطبيق WebView الحالي", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            Intent intent = new Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:" + webView.packageName));
+            startActivity(intent);
+        } catch (ActivityNotFoundException | SecurityException error) {
+            Toast.makeText(this, "تعذر فتح إعدادات WebView", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private NetworkHealth readNetworkHealth() {
@@ -545,18 +605,12 @@ public class TagerSettingsActivity extends Activity {
                 .append("\nAndroid ").append(Build.VERSION.RELEASE)
                 .append(" — API ").append(Build.VERSION.SDK_INT);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            try {
-                PackageInfo webView = WebView.getCurrentWebViewPackage();
-                if (webView != null) {
-                    info.append("\nWebView: ").append(webView.packageName)
-                            .append(" ").append(webView.versionName == null ? "" : webView.versionName);
-                } else {
-                    info.append("\nWebView: غير متاح");
-                }
-            } catch (RuntimeException ignored) {
-                info.append("\nWebView: غير متاح");
-            }
+        PackageInfo webView = currentWebViewPackage();
+        if (webView != null) {
+            info.append("\nWebView: ").append(webView.packageName)
+                    .append(" ").append(webView.versionName == null ? "" : webView.versionName);
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            info.append("\nWebView: غير متاح");
         }
         return info.toString();
     }
