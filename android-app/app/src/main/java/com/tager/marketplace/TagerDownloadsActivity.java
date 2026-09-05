@@ -10,6 +10,8 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
@@ -32,6 +34,16 @@ import java.util.Locale;
  */
 public class TagerDownloadsActivity extends Activity {
     private static final String TAGER_DOWNLOAD_MARKER = "Tager | تاجر";
+    private static final long AUTO_REFRESH_MS = 2000L;
+
+    private final Handler refreshHandler = new Handler(Looper.getMainLooper());
+    private final Runnable autoRefresh = new Runnable() {
+        @Override
+        public void run() {
+            refreshDownloads();
+            refreshHandler.postDelayed(this, AUTO_REFRESH_MS);
+        }
+    };
 
     private DownloadManager downloadManager;
     private LinearLayout listContainer;
@@ -51,6 +63,20 @@ public class TagerDownloadsActivity extends Activity {
     protected void onResume() {
         super.onResume();
         refreshDownloads();
+        refreshHandler.removeCallbacks(autoRefresh);
+        refreshHandler.postDelayed(autoRefresh, AUTO_REFRESH_MS);
+    }
+
+    @Override
+    protected void onPause() {
+        refreshHandler.removeCallbacks(autoRefresh);
+        super.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        refreshHandler.removeCallbacksAndMessages(null);
+        super.onDestroy();
     }
 
     private View buildContent() {
