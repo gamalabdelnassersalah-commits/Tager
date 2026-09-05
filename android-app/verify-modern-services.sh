@@ -23,7 +23,7 @@ grep -q 'openExternalWebLink' "$ACTIVITY"
 grep -q 'onPermissionRequest' "$ACTIVITY"
 grep -q 'request.deny()' "$ACTIVITY"
 
-# Background maintenance and Play update lifecycle.
+# Background maintenance and user-respecting Play update lifecycle.
 grep -q 'PeriodicWorkRequest' "$APP"
 grep -q 'ExistingPeriodicWorkPolicy.UPDATE' "$APP"
 grep -q 'TagerMaintenanceWorker.class' "$APP"
@@ -34,6 +34,12 @@ grep -q 'AppUpdateType.FLEXIBLE' "$UPDATE"
 grep -q 'completeUpdate()' "$UPDATE"
 grep -q 'CHECK_INTERVAL_MS' "$UPDATE"
 grep -q 'KEY_LAST_CHECK_AT' "$UPDATE"
+grep -q 'KEY_UPDATE_LATER_AT' "$UPDATE"
+grep -q 'KEY_INSTALL_LATER_AT' "$UPDATE"
+grep -q 'UPDATE_PROMPT_COOLDOWN_MS' "$UPDATE"
+grep -q 'INSTALL_PROMPT_COOLDOWN_MS' "$UPDATE"
+grep -q 'تحديث الآن' "$UPDATE"
+grep -q 'إعادة تشغيل وتثبيت' "$UPDATE"
 
 # Privacy-safe local crash health recording.
 test -f "$CRASH"
@@ -56,7 +62,7 @@ grep -q 'tager://' "$NOTIFY"
 grep -q 'ic_notification_tager' "$NOTIFY"
 test -f "$NOTIFICATION_ICON"
 
-# Native download center must stay app-private, Tager-scoped and metadata-only.
+# Native download center stays Tager-scoped and metadata-only.
 test -f "$DOWNLOADS"
 grep -q 'class TagerDownloadsActivity' "$DOWNLOADS"
 grep -q 'DownloadManager.Query' "$DOWNLOADS"
@@ -65,12 +71,16 @@ grep -q 'ACTION_VIEW_DOWNLOADS' "$DOWNLOADS"
 grep -q 'COLUMN_DESCRIPTION' "$DOWNLOADS"
 grep -q 'TAGER_DOWNLOAD_MARKER' "$DOWNLOADS"
 grep -q 'Tager | تاجر' "$DOWNLOADS"
+grep -q 'shareDownloadedFile' "$DOWNLOADS"
+grep -q 'Intent.ACTION_SEND' "$DOWNLOADS"
 if grep -Eq 'COLUMN_URI|COLUMN_LOCAL_URI|CookieManager|getCookie\(' "$DOWNLOADS"; then
   echo 'Download center must not read source URLs or cookies' >&2
   exit 1
 fi
+# It may be externally routed only through the exact Tager downloads deep link.
 grep -q 'android:name=".TagerDownloadsActivity"' "$MANIFEST"
-grep -A4 'android:name=".TagerDownloadsActivity"' "$MANIFEST" | grep -q 'android:exported="false"'
+grep -A10 'android:name=".TagerDownloadsActivity"' "$MANIFEST" | grep -q 'android:exported="true"'
+grep -A10 'android:name=".TagerDownloadsActivity"' "$MANIFEST" | grep -q 'android:scheme="tager" android:host="downloads"'
 test -f "$DOWNLOAD_ICON"
 
 # Native launcher shortcuts and deep-link routing.
