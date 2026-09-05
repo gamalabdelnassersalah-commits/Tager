@@ -120,9 +120,21 @@ public class TagerSettingsActivity extends Activity {
         infoParams.topMargin = dp(8);
         card.addView(info, infoParams);
 
+        TextView privacy = new TextView(this);
+        privacy.setText("تقرير التشخيص لا يتضمن حسابك أو الروابط أو Cookies أو معرف الجهاز أو تفاصيل Crash.");
+        privacy.setTextSize(13f);
+        privacy.setTextColor(getColor(R.color.tager_text_muted));
+        LinearLayout.LayoutParams privacyParams = new LinearLayout.LayoutParams(-1, -2);
+        privacyParams.topMargin = dp(8);
+        card.addView(privacy, privacyParams);
+
         Button copyDiagnostics = actionButton("نسخ تقرير التشخيص الآمن");
         copyDiagnostics.setOnClickListener(v -> copyDiagnostics());
         addButton(card, copyDiagnostics);
+
+        Button shareDiagnostics = actionButton("مشاركة تقرير التشخيص");
+        shareDiagnostics.setOnClickListener(v -> shareDiagnostics());
+        addButton(card, shareDiagnostics);
         return card;
     }
 
@@ -228,6 +240,18 @@ public class TagerSettingsActivity extends Activity {
         String report = buildDiagnosticsReport();
         clipboard.setPrimaryClip(ClipData.newPlainText("Tager diagnostics", report));
         Toast.makeText(this, "تم نسخ تقرير التشخيص بدون بيانات حساب أو روابط", Toast.LENGTH_SHORT).show();
+    }
+
+    private void shareDiagnostics() {
+        Intent share = new Intent(Intent.ACTION_SEND);
+        share.setType("text/plain");
+        share.putExtra(Intent.EXTRA_SUBJECT, "Tager Android diagnostics");
+        share.putExtra(Intent.EXTRA_TEXT, buildDiagnosticsReport());
+        try {
+            startActivity(Intent.createChooser(share, "مشاركة تقرير تشخيص تاجر"));
+        } catch (ActivityNotFoundException | SecurityException error) {
+            Toast.makeText(this, "تعذر فتح تطبيق للمشاركة", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private String buildDiagnosticsReport() {
