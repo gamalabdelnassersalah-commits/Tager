@@ -69,10 +69,13 @@ grep -q 'DownloadManager.Query' "$DOWNLOADS"
 grep -q 'getUriForDownloadedFile' "$DOWNLOADS"
 grep -q 'ACTION_VIEW_DOWNLOADS' "$DOWNLOADS"
 grep -q 'COLUMN_DESCRIPTION' "$DOWNLOADS"
+grep -q 'COLUMN_REASON' "$DOWNLOADS"
 grep -q 'TAGER_DOWNLOAD_MARKER' "$DOWNLOADS"
 grep -q 'Tager | تاجر' "$DOWNLOADS"
 grep -q 'shareDownloadedFile' "$DOWNLOADS"
 grep -q 'Intent.ACTION_SEND' "$DOWNLOADS"
+grep -q 'ERROR_INSUFFICIENT_SPACE' "$DOWNLOADS"
+grep -q 'PAUSED_WAITING_FOR_NETWORK' "$DOWNLOADS"
 if grep -Eq 'COLUMN_URI|COLUMN_LOCAL_URI|CookieManager|getCookie\(' "$DOWNLOADS"; then
   echo 'Download center must not read source URLs or cookies' >&2
   exit 1
