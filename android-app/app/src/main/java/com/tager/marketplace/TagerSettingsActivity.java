@@ -3,9 +3,12 @@ package com.tager.marketplace;
 import android.Manifest;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
@@ -81,9 +84,7 @@ public class TagerSettingsActivity extends Activity {
 
     private View buildNotificationCard() {
         LinearLayout card = newCard();
-
-        TextView heading = heading("الإشعارات");
-        card.addView(heading);
+        card.addView(heading("الإشعارات"));
 
         notificationStatus = new TextView(this);
         notificationStatus.setTextSize(15f);
@@ -118,6 +119,10 @@ public class TagerSettingsActivity extends Activity {
         LinearLayout.LayoutParams infoParams = new LinearLayout.LayoutParams(-1, -2);
         infoParams.topMargin = dp(8);
         card.addView(info, infoParams);
+
+        Button copyDiagnostics = actionButton("نسخ تقرير التشخيص الآمن");
+        copyDiagnostics.setOnClickListener(v -> copyDiagnostics());
+        addButton(card, copyDiagnostics);
         return card;
     }
 
@@ -214,6 +219,47 @@ public class TagerSettingsActivity extends Activity {
         Toast.makeText(this, "تم إرسال إشعار اختبار", Toast.LENGTH_SHORT).show();
     }
 
+    private void copyDiagnostics() {
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard == null) {
+            Toast.makeText(this, "تعذر الوصول إلى الحافظة", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String report = buildDiagnosticsReport();
+        clipboard.setPrimaryClip(ClipData.newPlainText("Tager diagnostics", report));
+        Toast.makeText(this, "تم نسخ تقرير التشخيص بدون بيانات حساب أو روابط", Toast.LENGTH_SHORT).show();
+    }
+
+    private String buildDiagnosticsReport() {
+        boolean permissionGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+                || ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                == PackageManager.PERMISSION_GRANTED;
+        boolean notificationsEnabled = permissionGranted
+                && NotificationManagerCompat.from(this).areNotificationsEnabled();
+
+        StringBuilder report = new StringBuilder();
+        report.append("Tager Android diagnostics")
+                .append("\nApp: ").append(BuildConfig.VERSION_NAME)
+                .append(" (build ").append(BuildConfig.VERSION_CODE).append(")")
+                .append("\nAndroid: ").append(Build.VERSION.RELEASE)
+                .append(" / API ").append(Build.VERSION.SDK_INT)
+                .append("\nNotifications: ").append(notificationsEnabled ? "enabled" : "disabled");
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                PackageInfo webView = WebView.getCurrentWebViewPackage();
+                if (webView != null) {
+                    report.append("\nWebView: ").append(webView.packageName)
+                            .append(" ").append(webView.versionName == null ? "" : webView.versionName);
+                }
+            } catch (RuntimeException ignored) {
+                report.append("\nWebView: unavailable");
+            }
+        }
+        report.append("\nPrivacy: no account, URL, cookie, device ID or crash stack included");
+        return report.toString();
+    }
+
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -239,6 +285,10 @@ public class TagerSettingsActivity extends Activity {
     }
 
     private void openNotificationSettings() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            openApplicationSettings();
+            return;
+        }
         Intent intent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                 .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
         try {
