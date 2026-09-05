@@ -27,10 +27,12 @@ import java.util.Locale;
 
 /**
  * Native download center for files downloaded by Tager through Android's
- * DownloadManager. It does not read source URLs, cookies, account data or file
- * contents; it only presents DownloadManager metadata owned by this app.
+ * DownloadManager. It never reads source URLs, cookies, account data or file
+ * contents, and only presents rows carrying Tager's own download marker.
  */
 public class TagerDownloadsActivity extends Activity {
+    private static final String TAGER_DOWNLOAD_MARKER = "Tager | تاجر";
+
     private DownloadManager downloadManager;
     private LinearLayout listContainer;
     private TextView summaryView;
@@ -171,6 +173,7 @@ public class TagerDownloadsActivity extends Activity {
             if (cursor == null) return items;
             int idCol = cursor.getColumnIndex(DownloadManager.COLUMN_ID);
             int titleCol = cursor.getColumnIndex(DownloadManager.COLUMN_TITLE);
+            int descriptionCol = cursor.getColumnIndex(DownloadManager.COLUMN_DESCRIPTION);
             int statusCol = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS);
             int currentCol = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR);
             int totalCol = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES);
@@ -178,7 +181,10 @@ public class TagerDownloadsActivity extends Activity {
             int modifiedCol = cursor.getColumnIndex(DownloadManager.COLUMN_LAST_MODIFIED_TIMESTAMP);
 
             while (cursor.moveToNext()) {
-                if (idCol < 0 || statusCol < 0) continue;
+                if (idCol < 0 || statusCol < 0 || descriptionCol < 0) continue;
+                String description = cursor.getString(descriptionCol);
+                if (!TAGER_DOWNLOAD_MARKER.equals(description)) continue;
+
                 DownloadItem item = new DownloadItem();
                 item.id = cursor.getLong(idCol);
                 item.title = titleCol >= 0 ? cursor.getString(titleCol) : null;
