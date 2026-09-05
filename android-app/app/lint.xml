@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- onSafeBrowsingHit is an API 27 callback and cannot be invoked by the
+         framework on older Android versions. Keep NewApi checking enabled
+         everywhere else and suppress only its API-27 response method. -->
+    <issue id="NewApi">
+        <ignore regexp="SafeBrowsingResponse#backToSafety" />
+    </issue>
+</lint>
