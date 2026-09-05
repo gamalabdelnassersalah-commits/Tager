@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="products"
+        android:enabled="true"
+        android:icon="@drawable/ic_nav_products"
+        android:shortcutShortLabel="@string/shortcut_products_short"
+        android:shortcutLongLabel="@string/shortcut_products_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="tager://products" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="track"
+        android:enabled="true"
+        android:icon="@drawable/ic_nav_track"
+        android:shortcutShortLabel="@string/shortcut_track_short"
+        android:shortcutLongLabel="@string/shortcut_track_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="tager://track" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="cart"
+        android:enabled="true"
+        android:icon="@drawable/ic_nav_cart"
+        android:shortcutShortLabel="@string/shortcut_cart_short"
+        android:shortcutLongLabel="@string/shortcut_cart_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="tager://cart" />
+    </shortcut>
+</shortcuts>
