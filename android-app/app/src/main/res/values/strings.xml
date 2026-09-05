@@ -7,4 +7,6 @@
     <string name="shortcut_track_long">متابعة حالة الطلب</string>
     <string name="shortcut_cart_short">السلة</string>
     <string name="shortcut_cart_long">فتح سلة المشتريات</string>
+    <string name="shortcut_downloads_short">التنزيلات</string>
+    <string name="shortcut_downloads_long">فتح مركز تنزيلات تاجر</string>
 </resources>
