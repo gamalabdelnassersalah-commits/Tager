@@ -1,6 +1,7 @@
 package com.tager.marketplace;
 
 import android.app.Activity;
+import android.content.IntentSender;
 import android.widget.Toast;
 
 import com.google.android.play.core.appupdate.AppUpdateInfo;
@@ -18,21 +19,24 @@ final class TagerUpdateCoordinator {
     private static final int UPDATE_REQUEST_CODE = 6202;
 
     private final AppUpdateManager updateManager;
+    private final InstallStateUpdatedListener installListener;
     private WeakReference<Activity> activityRef = new WeakReference<>(null);
     private boolean updateFlowStarted;
 
-    private final InstallStateUpdatedListener installListener = state -> {
-        if (state.installStatus() == InstallStatus.DOWNLOADED) {
-            Activity activity = activityRef.get();
-            if (activity != null && !activity.isFinishing()) {
-                Toast.makeText(activity, "تم تنزيل تحديث تاجر — سيتم تثبيته الآن", Toast.LENGTH_LONG).show();
-            }
-            updateManager.completeUpdate();
-        }
-    };
-
     TagerUpdateCoordinator(TagerApplication application) {
         updateManager = AppUpdateManagerFactory.create(application);
+        installListener = state -> {
+            if (state.installStatus() == InstallStatus.DOWNLOADED) {
+                Activity activity = activityRef.get();
+                if (activity != null && !activity.isFinishing()) {
+                    Toast.makeText(
+                            activity,
+                            "تم تنزيل تحديث تاجر — سيتم تثبيته الآن",
+                            Toast.LENGTH_LONG).show();
+                }
+                updateManager.completeUpdate();
+            }
+        };
         updateManager.registerListener(installListener);
     }
 
@@ -83,7 +87,8 @@ final class TagerUpdateCoordinator {
     }
 
     private void startFlexibleUpdate(Activity activity, AppUpdateInfo info) {
-        if (updateFlowStarted && info.updateAvailability() != UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
+        if (updateFlowStarted
+                && info.updateAvailability() != UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
             return;
         }
         try {
@@ -93,7 +98,7 @@ final class TagerUpdateCoordinator {
                     activity,
                     AppUpdateOptions.newBuilder(AppUpdateType.FLEXIBLE).build(),
                     UPDATE_REQUEST_CODE);
-        } catch (RuntimeException error) {
+        } catch (IntentSender.SendIntentException | RuntimeException error) {
             updateFlowStarted = false;
         }
     }
