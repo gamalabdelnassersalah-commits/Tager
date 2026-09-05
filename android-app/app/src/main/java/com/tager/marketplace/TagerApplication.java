@@ -9,9 +9,7 @@ import android.os.Bundle;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.work.Constraints;
 import androidx.work.ExistingPeriodicWorkPolicy;
-import androidx.work.NetworkType;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
 
@@ -28,6 +26,7 @@ public class TagerApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        installCrashRecorder();
         createNotificationChannels();
         scheduleMaintenance();
         updateCoordinator = new TagerUpdateCoordinator(this);
@@ -43,6 +42,18 @@ public class TagerApplication extends Application {
             @Override public void onActivityStopped(@NonNull Activity activity) { }
             @Override public void onActivitySaveInstanceState(@NonNull Activity activity, @NonNull Bundle outState) { }
             @Override public void onActivityDestroyed(@NonNull Activity activity) { }
+        });
+    }
+
+    private void installCrashRecorder() {
+        Thread.UncaughtExceptionHandler previous = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler((thread, error) -> {
+            TagerCrashRecorder.record(this, thread, error);
+            if (previous != null) {
+                previous.uncaughtException(thread, error);
+            } else {
+                System.exit(10);
+            }
         });
     }
 
@@ -75,14 +86,10 @@ public class TagerApplication extends Application {
     }
 
     private void scheduleMaintenance() {
-        Constraints constraints = new Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .build();
         PeriodicWorkRequest request = new PeriodicWorkRequest.Builder(
                 TagerMaintenanceWorker.class,
                 24,
                 TimeUnit.HOURS)
-                .setConstraints(constraints)
                 .build();
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
                 PERIODIC_MAINTENANCE,
