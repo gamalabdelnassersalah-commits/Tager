@@ -17,6 +17,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -234,6 +235,16 @@ public class TagerDownloadsActivity extends Activity {
         statusParams.topMargin = dp(5);
         card.addView(status, statusParams);
 
+        if (item.status == DownloadManager.STATUS_RUNNING && item.totalBytes > 0L && item.currentBytes >= 0L) {
+            ProgressBar progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+            progress.setMax(100);
+            progress.setProgress(progressPercent(item));
+            progress.setContentDescription("تقدم التنزيل " + progressPercent(item) + " بالمئة");
+            LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(-1, dp(8));
+            progressParams.topMargin = dp(8);
+            card.addView(progress, progressParams);
+        }
+
         if (item.modifiedAt > 0L) {
             TextView date = new TextView(this);
             date.setText(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT,
@@ -283,6 +294,11 @@ public class TagerDownloadsActivity extends Activity {
         cardParams.bottomMargin = dp(10);
         card.setLayoutParams(cardParams);
         return card;
+    }
+
+    private int progressPercent(DownloadItem item) {
+        if (item == null || item.totalBytes <= 0L || item.currentBytes < 0L) return 0;
+        return (int) Math.min(100L, (item.currentBytes * 100L) / item.totalBytes);
     }
 
     private boolean isActive(int status) {
@@ -336,8 +352,7 @@ public class TagerDownloadsActivity extends Activity {
                 return "في انتظار بدء التنزيل";
             case DownloadManager.STATUS_RUNNING:
                 if (item.totalBytes > 0L && item.currentBytes >= 0L) {
-                    long percent = Math.min(100L, (item.currentBytes * 100L) / item.totalBytes);
-                    return "جاري التنزيل — " + percent + "%  •  " + formatBytes(item.currentBytes)
+                    return "جاري التنزيل — " + progressPercent(item) + "%  •  " + formatBytes(item.currentBytes)
                             + " / " + formatBytes(item.totalBytes);
                 }
                 return "جاري التنزيل";
