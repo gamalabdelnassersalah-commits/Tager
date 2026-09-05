@@ -4,45 +4,19 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Camera is optional because Tager can still upload existing files/images. -->
     <uses-feature
         android:name="android.hardware.camera.any"
         android:required="false" />
 
-    <!-- Android 11+ package visibility for intents that Tager probes with
-         resolveActivity/queryIntentActivities before launching. -->
     <queries>
-        <intent>
-            <action android:name="android.media.action.IMAGE_CAPTURE" />
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="tel" />
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="mailto" />
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="sms" />
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="whatsapp" />
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="market" />
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="http" />
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="https" />
-        </intent>
+        <intent><action android:name="android.media.action.IMAGE_CAPTURE" /></intent>
+        <intent><action android:name="android.intent.action.VIEW" /><data android:scheme="tel" /></intent>
+        <intent><action android:name="android.intent.action.VIEW" /><data android:scheme="mailto" /></intent>
+        <intent><action android:name="android.intent.action.VIEW" /><data android:scheme="sms" /></intent>
+        <intent><action android:name="android.intent.action.VIEW" /><data android:scheme="whatsapp" /></intent>
+        <intent><action android:name="android.intent.action.VIEW" /><data android:scheme="market" /></intent>
+        <intent><action android:name="android.intent.action.VIEW" /><data android:scheme="http" /></intent>
+        <intent><action android:name="android.intent.action.VIEW" /><data android:scheme="https" /></intent>
     </queries>
 
     <application
@@ -71,9 +45,16 @@
 
         <activity
             android:name=".TagerDownloadsActivity"
-            android:exported="false"
+            android:exported="true"
             android:label="تنزيلات تاجر"
-            android:theme="@style/Theme.Tager" />
+            android:theme="@style/Theme.Tager">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="tager" android:host="downloads" />
+            </intent-filter>
+        </activity>
 
         <activity
             android:name=".TagerActivity"
@@ -103,9 +84,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="https"
-                    android:host="tager-new.vercel.app" />
+                <data android:scheme="https" android:host="tager-new.vercel.app" />
             </intent-filter>
         </activity>
     </application>
