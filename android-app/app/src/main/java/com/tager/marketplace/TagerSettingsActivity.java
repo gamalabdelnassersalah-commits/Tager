@@ -29,6 +29,10 @@ import android.widget.Toast;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 
+import java.text.DateFormat;
+import java.util.Date;
+import java.util.Locale;
+
 /** Native settings/status center for Tager Android. */
 public class TagerSettingsActivity extends Activity {
     private static final int NOTIFICATION_PERMISSION_REQUEST = 7301;
@@ -36,6 +40,7 @@ public class TagerSettingsActivity extends Activity {
 
     private TextView notificationStatus;
     private TextView channelStatus;
+    private TextView runtimeStatus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,6 +54,7 @@ public class TagerSettingsActivity extends Activity {
     protected void onResume() {
         super.onResume();
         refreshNotificationStatus();
+        refreshRuntimeStatus();
     }
 
     private View buildContent() {
@@ -80,6 +86,7 @@ public class TagerSettingsActivity extends Activity {
         root.addView(subtitle, subtitleParams);
 
         root.addView(buildNotificationCard());
+        root.addView(buildRuntimeHealthCard());
         root.addView(buildAppInfoCard());
         root.addView(buildActionsCard());
         return scroll;
@@ -112,9 +119,46 @@ public class TagerSettingsActivity extends Activity {
         test.setOnClickListener(v -> testNotification());
         addButton(card, test);
 
-        Button settings = actionButton("إعدادات إشعارات Android");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Button orders = actionButton("إعدادات إشعارات الطلبات");
+            orders.setOnClickListener(v -> openNotificationChannelSettings(TagerApplication.CHANNEL_ORDERS));
+            addButton(card, orders);
+
+            Button messages = actionButton("إعدادات إشعارات الرسائل");
+            messages.setOnClickListener(v -> openNotificationChannelSettings(TagerApplication.CHANNEL_MESSAGES));
+            addButton(card, messages);
+
+            Button downloads = actionButton("إعدادات إشعارات التنزيلات");
+            downloads.setOnClickListener(v -> openNotificationChannelSettings(TagerApplication.CHANNEL_DOWNLOADS));
+            addButton(card, downloads);
+        }
+
+        Button settings = actionButton("كل إعدادات إشعارات Android");
         settings.setOnClickListener(v -> openNotificationSettings());
         addButton(card, settings);
+        return card;
+    }
+
+    private View buildRuntimeHealthCard() {
+        LinearLayout card = newCard();
+        card.addView(heading("استقرار التطبيق"));
+
+        runtimeStatus = new TextView(this);
+        runtimeStatus.setText("جاري قراءة حالة التشغيل المحلية…");
+        runtimeStatus.setTextSize(14f);
+        runtimeStatus.setTextColor(getColor(R.color.tager_text_muted));
+        runtimeStatus.setLineSpacing(0f, 1.2f);
+        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(-1, -2);
+        statusParams.topMargin = dp(7);
+        card.addView(runtimeStatus, statusParams);
+
+        TextView privacy = new TextView(this);
+        privacy.setText("يتم عرض الوقت والعدد ونسخة التطبيق فقط. لا يتم عرض رسالة الخطأ أو Stack Trace أو بيانات الحساب.");
+        privacy.setTextSize(12f);
+        privacy.setTextColor(getColor(R.color.tager_text_muted));
+        LinearLayout.LayoutParams privacyParams = new LinearLayout.LayoutParams(-1, -2);
+        privacyParams.topMargin = dp(7);
+        card.addView(privacy, privacyParams);
         return card;
     }
 
@@ -269,6 +313,7 @@ public class TagerSettingsActivity extends Activity {
         boolean permissionGranted = notificationPermissionGranted();
         boolean notificationsEnabled = permissionGranted
                 && NotificationManagerCompat.from(this).areNotificationsEnabled();
+        TagerCrashRecorder.Snapshot runtime = TagerCrashRecorder.snapshot(this);
 
         StringBuilder report = new StringBuilder();
         report.append("Tager Android diagnostics")
@@ -292,7 +337,10 @@ public class TagerSettingsActivity extends Activity {
                 report.append("\nWebView: unavailable");
             }
         }
-        report.append("\nPrivacy: no account, URL, cookie, device ID or crash stack included");
+        report.append("\nRuntime health: crashes=").append(runtime.crashCount)
+                .append(", last_crash_at=").append(runtime.lastCrashAt)
+                .append(", version=").append(runtime.version);
+        report.append("\nPrivacy: no account, URL, cookie, device ID, crash message or crash stack included");
         return report.toString();
     }
 
@@ -333,6 +381,24 @@ public class TagerSettingsActivity extends Activity {
                 + "  •  التنزيلات: " + channelLabel(TagerApplication.CHANNEL_DOWNLOADS));
     }
 
+    private void refreshRuntimeStatus() {
+        if (runtimeStatus == null) return;
+        TagerCrashRecorder.Snapshot runtime = TagerCrashRecorder.snapshot(this);
+        if (!runtime.hasCrash()) {
+            runtimeStatus.setText("الحالة: مستقرة — لا يوجد Crash محلي مسجل في فترة الاحتفاظ الحالية.");
+            runtimeStatus.setTextColor(getColor(R.color.tager_teal));
+            return;
+        }
+        String when = DateFormat.getDateTimeInstance(
+                DateFormat.MEDIUM,
+                DateFormat.SHORT,
+                Locale.getDefault()).format(new Date(runtime.lastCrashAt));
+        runtimeStatus.setText("تم تسجيل Crash محلي سابقًا\nآخر تسجيل: " + when
+                + "\nالعدد خلال فترة الاحتفاظ: " + runtime.crashCount
+                + "\nنسخة التطبيق وقت آخر تسجيل: " + runtime.version);
+        runtimeStatus.setTextColor(getColor(R.color.tager_orange));
+    }
+
     private String channelLabel(String channelId) {
         return channelEnabled(channelId) ? "مفعلة" : "متوقفة";
     }
@@ -345,6 +411,21 @@ public class TagerSettingsActivity extends Activity {
         return channel != null && channel.getImportance() != NotificationManager.IMPORTANCE_NONE;
     }
 
+    private void openNotificationChannelSettings(String channelId) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            openNotificationSettings();
+            return;
+        }
+        Intent intent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName())
+                .putExtra(Settings.EXTRA_CHANNEL_ID, channelId);
+        try {
+            startActivity(intent);
+        } catch (ActivityNotFoundException | SecurityException error) {
+            openNotificationSettings();
+        }
+    }
+
     private void openNotificationSettings() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             openApplicationSettings();
@@ -354,7 +435,7 @@ public class TagerSettingsActivity extends Activity {
                 .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
         try {
             startActivity(intent);
-        } catch (ActivityNotFoundException error) {
+        } catch (ActivityNotFoundException | SecurityException error) {
             openApplicationSettings();
         }
     }
@@ -365,7 +446,7 @@ public class TagerSettingsActivity extends Activity {
                     Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                     Uri.parse("package:" + getPackageName()));
             startActivity(intent);
-        } catch (ActivityNotFoundException error) {
+        } catch (ActivityNotFoundException | SecurityException error) {
             Toast.makeText(this, "تعذر فتح إعدادات Android", Toast.LENGTH_SHORT).show();
         }
     }
@@ -383,6 +464,8 @@ public class TagerSettingsActivity extends Activity {
                 if (webView != null) {
                     info.append("\nWebView: ").append(webView.packageName)
                             .append(" ").append(webView.versionName == null ? "" : webView.versionName);
+                } else {
+                    info.append("\nWebView: غير متاح");
                 }
             } catch (RuntimeException ignored) {
                 info.append("\nWebView: غير متاح");
