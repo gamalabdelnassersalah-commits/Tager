@@ -21,7 +21,6 @@ import android.widget.Toast;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -194,7 +193,7 @@ public class TagerDownloadsActivity extends Activity {
             return Collections.emptyList();
         }
 
-        items.sort((left, right) -> Long.compare(right.modifiedAt, left.modifiedAt));
+        Collections.sort(items, (left, right) -> Long.compare(right.modifiedAt, left.modifiedAt));
         return items;
     }
 
