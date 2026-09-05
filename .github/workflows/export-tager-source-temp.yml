@@ -1,0 +1,25 @@
+name: Export Tager Android Source Temp
+
+on:
+  push:
+    branches:
+      - android-v2.0-ux-compat
+    paths:
+      - '.github/workflows/export-tager-source-temp.yml'
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Package source
+        run: |
+          mkdir -p out
+          cp android-app/app/src/main/java/com/tager/marketplace/TagerActivity.java out/TagerActivity.java
+      - name: Upload source
+        uses: actions/upload-artifact@v4
+        with:
+          name: tager-activity-source-temp
+          path: out/TagerActivity.java
+          if-no-files-found: error
