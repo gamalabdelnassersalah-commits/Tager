@@ -32,6 +32,19 @@ final class TagerCrashRecorder {
         }
     }
 
+    static Snapshot snapshot(Context context) {
+        if (context == null) return Snapshot.empty();
+        try {
+            SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            return new Snapshot(
+                    Math.max(0L, prefs.getLong(KEY_LAST_CRASH_AT, 0L)),
+                    Math.max(0, prefs.getInt(KEY_CRASH_COUNT, 0)),
+                    sanitize(prefs.getString(KEY_LAST_CRASH_VERSION, "unknown")));
+        } catch (RuntimeException ignored) {
+            return Snapshot.empty();
+        }
+    }
+
     static void clearStale(Context context, long maxAgeMs) {
         if (context == null) return;
         try {
@@ -48,5 +61,25 @@ final class TagerCrashRecorder {
         if (value == null) return "unknown";
         String safe = value.replaceAll("[^A-Za-z0-9_.$-]", "_");
         return safe.length() > 120 ? safe.substring(0, 120) : safe;
+    }
+
+    static final class Snapshot {
+        final long lastCrashAt;
+        final int crashCount;
+        final String version;
+
+        Snapshot(long lastCrashAt, int crashCount, String version) {
+            this.lastCrashAt = lastCrashAt;
+            this.crashCount = crashCount;
+            this.version = version == null ? "unknown" : version;
+        }
+
+        boolean hasCrash() {
+            return lastCrashAt > 0L && crashCount > 0;
+        }
+
+        static Snapshot empty() {
+            return new Snapshot(0L, 0, "unknown");
+        }
     }
 }
