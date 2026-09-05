@@ -2,14 +2,15 @@ package com.tager.marketplace;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * Pure-Java trust policy for URLs entering Tager from shares, notifications,
- * App Links, and other Android surfaces. Keeping this class Android-free makes
- * the security rules independently unit-testable on every CI build.
+ * App Links, startup resume, and other Android surfaces.
  */
 final class TagerTrustedLinkPolicy {
     static final String PRODUCTION_HOST = "tager-new.vercel.app";
@@ -64,41 +65,35 @@ final class TagerTrustedLinkPolicy {
         String beforeFragment = fragmentIndex >= 0 ? target.substring(0, fragmentIndex) : target;
 
         int queryIndex = beforeFragment.indexOf('?');
+        String base = queryIndex >= 0 ? beforeFragment.substring(0, queryIndex) : beforeFragment;
         String rawQuery = queryIndex >= 0 ? beforeFragment.substring(queryIndex + 1) : "";
-        StringBuilder enriched = new StringBuilder(beforeFragment);
+        StringBuilder query = new StringBuilder();
 
-        if (!hasRawQueryParameter(rawQuery, "tager_app")) {
-            appendRawQueryParameter(enriched, "tager_app", "android");
-            rawQuery = rawQuery.isEmpty() ? "tager_app=android" : rawQuery + "&tager_app=android";
+        if (!rawQuery.isEmpty()) {
+            for (String part : rawQuery.split("&", -1)) {
+                if (part.isEmpty()) continue;
+                int equals = part.indexOf('=');
+                String rawKey = equals >= 0 ? part.substring(0, equals) : part;
+                String key = decodeQueryKey(rawKey);
+                if ("tager_app".equals(key) || "app_version".equals(key)) continue;
+                if (query.length() > 0) query.append('&');
+                query.append(part);
+            }
         }
-        if (!hasRawQueryParameter(rawQuery, "app_version")) {
-            appendRawQueryParameter(enriched, "app_version", safeVersion);
-        }
-        enriched.append(fragment);
-        String result = enriched.toString();
+
+        if (query.length() > 0) query.append('&');
+        query.append("tager_app=android&app_version=").append(safeVersion);
+
+        String result = base + "?" + query + fragment;
         return isTrustedUrl(result) ? result : null;
     }
 
-    private static void appendRawQueryParameter(StringBuilder target, String key, String value) {
-        int fragmentIndex = target.indexOf("#");
-        String current = fragmentIndex >= 0 ? target.substring(0, fragmentIndex) : target.toString();
-        if (current.indexOf('?') < 0) {
-            target.append('?');
-        } else if (!current.endsWith("?") && !current.endsWith("&")) {
-            target.append('&');
+    private static String decodeQueryKey(String value) {
+        try {
+            return URLDecoder.decode(value, StandardCharsets.UTF_8.name()).toLowerCase(Locale.ROOT);
+        } catch (Exception ignored) {
+            return value == null ? "" : value.toLowerCase(Locale.ROOT);
         }
-        target.append(key).append('=').append(value);
-    }
-
-    private static boolean hasRawQueryParameter(String rawQuery, String expectedKey) {
-        if (rawQuery == null || rawQuery.isEmpty()) return false;
-        String[] parts = rawQuery.split("&", -1);
-        for (String part : parts) {
-            int equals = part.indexOf('=');
-            String key = equals >= 0 ? part.substring(0, equals) : part;
-            if (expectedKey.equals(key)) return true;
-        }
-        return false;
     }
 
     private static String sanitizeVersion(String value) {

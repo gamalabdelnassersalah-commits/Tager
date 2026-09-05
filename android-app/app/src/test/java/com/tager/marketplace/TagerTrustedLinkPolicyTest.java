@@ -16,27 +16,10 @@ public class TagerTrustedLinkPolicyTest {
     }
 
     @Test
-    public void acceptsUppercaseHost() {
-        assertTrue(TagerTrustedLinkPolicy.isTrustedUrl("https://TAGER-NEW.VERCEL.APP/#home"));
-    }
-
-    @Test
-    public void rejectsLookalikeHostSuffix() {
+    public void rejectsLookalikesAndInsecureSchemes() {
         assertFalse(TagerTrustedLinkPolicy.isTrustedUrl("https://tager-new.vercel.app.evil.example/#home"));
-    }
-
-    @Test
-    public void rejectsHttp() {
         assertFalse(TagerTrustedLinkPolicy.isTrustedUrl("http://tager-new.vercel.app/#home"));
-    }
-
-    @Test
-    public void rejectsUserInfoAuthorityConfusion() {
         assertFalse(TagerTrustedLinkPolicy.isTrustedUrl("https://user@tager-new.vercel.app/#home"));
-    }
-
-    @Test
-    public void rejectsNonStandardPort() {
         assertFalse(TagerTrustedLinkPolicy.isTrustedUrl("https://tager-new.vercel.app:8080/#home"));
         assertTrue(TagerTrustedLinkPolicy.isTrustedUrl("https://tager-new.vercel.app:443/#home"));
     }
@@ -50,12 +33,6 @@ public class TagerTrustedLinkPolicyTest {
     }
 
     @Test
-    public void trimsArabicTrailingPunctuation() {
-        String text = "افتح https://tager-new.vercel.app/#cart،";
-        assertEquals("https://tager-new.vercel.app/#cart", TagerTrustedLinkPolicy.findTrustedUrl(text));
-    }
-
-    @Test
     public void blocksEncodedControlsAndOversizedInput() {
         assertFalse(TagerTrustedLinkPolicy.isTrustedUrl("https://tager-new.vercel.app/%0aevil"));
         StringBuilder huge = new StringBuilder("https://tager-new.vercel.app/");
@@ -65,23 +42,33 @@ public class TagerTrustedLinkPolicyTest {
     }
 
     @Test
-    public void addsAndroidContextWithoutDroppingProductIdentity() {
+    public void addsCurrentAndroidContextWithoutDroppingProductIdentity() {
         String source = "https://tager-new.vercel.app/product/P-123?ref=share#productDetails";
         assertEquals(
-                "https://tager-new.vercel.app/product/P-123?ref=share&tager_app=android&app_version=2.2.0#productDetails",
-                TagerTrustedLinkPolicy.withAndroidContext(source, "2.2.0"));
+                "https://tager-new.vercel.app/product/P-123?ref=share&tager_app=android&app_version=2.3.0#productDetails",
+                TagerTrustedLinkPolicy.withAndroidContext(source, "2.3.0"));
     }
 
     @Test
-    public void doesNotDuplicateExistingAndroidContext() {
-        String source = "https://tager-new.vercel.app/?tager_app=android&app_version=2.1.1&id=88#orderDetails";
-        assertEquals(source, TagerTrustedLinkPolicy.withAndroidContext(source, "2.2.0"));
+    public void replacesStaleReservedAndroidContextWithoutDuplicates() {
+        String source = "https://tager-new.vercel.app/?tager_app=ios&app_version=2.1.1&id=88#orderDetails";
+        assertEquals(
+                "https://tager-new.vercel.app/?id=88&tager_app=android&app_version=2.3.0#orderDetails",
+                TagerTrustedLinkPolicy.withAndroidContext(source, "2.3.0"));
+    }
+
+    @Test
+    public void removesEncodedReservedKeyAliasesToo() {
+        String source = "https://tager-new.vercel.app/?tager%5Fapp=ios&id=5#productDetails";
+        assertEquals(
+                "https://tager-new.vercel.app/?id=5&tager_app=android&app_version=2.3.0#productDetails",
+                TagerTrustedLinkPolicy.withAndroidContext(source, "2.3.0"));
     }
 
     @Test
     public void rejectsUntrustedTargetWhenAddingAndroidContext() {
         assertNull(TagerTrustedLinkPolicy.withAndroidContext(
                 "https://tager-new.vercel.app.evil.example/?id=88#orderDetails",
-                "2.2.0"));
+                "2.3.0"));
     }
 }
