@@ -86,7 +86,9 @@ grep -q 'testNotification' "$SETTINGS"
 grep -q 'showMessageNotification' "$SETTINGS"
 grep -q 'TEST_NOTIFICATION_ID' "$SETTINGS"
 grep -q 'copyDiagnostics' "$SETTINGS"
+grep -q 'shareDiagnostics' "$SETTINGS"
 grep -q 'ClipboardManager' "$SETTINGS"
+grep -q 'Intent.ACTION_SEND' "$SETTINGS"
 grep -q 'buildDiagnosticsReport' "$SETTINGS"
 grep -q 'no account, URL, cookie, device ID or crash stack included' "$SETTINGS"
 grep -q 'Build.VERSION.SDK_INT < Build.VERSION_CODES.O' "$SETTINGS"
@@ -108,8 +110,16 @@ grep -q 'shareDownloadedFile' "$DOWNLOADS"
 grep -q 'Intent.ACTION_SEND' "$DOWNLOADS"
 grep -q 'ERROR_INSUFFICIENT_SPACE' "$DOWNLOADS"
 grep -q 'PAUSED_WAITING_FOR_NETWORK' "$DOWNLOADS"
+grep -q 'confirmDownloadRemoval' "$DOWNLOADS"
+grep -q 'downloadManager.remove' "$DOWNLOADS"
+grep -q 'scheduleActiveRefresh' "$DOWNLOADS"
+grep -q 'hasActiveDownloads' "$DOWNLOADS"
 if grep -Eq 'COLUMN_URI|COLUMN_LOCAL_URI|CookieManager|getCookie\(' "$DOWNLOADS"; then
   echo 'Download center must not read source URLs or cookies' >&2
+  exit 1
+fi
+if grep -q 'postDelayed(this, AUTO_REFRESH_MS)' "$DOWNLOADS"; then
+  echo 'Download center must not poll forever when no active downloads exist' >&2
   exit 1
 fi
 grep -q 'android:name=".TagerDownloadsActivity"' "$MANIFEST"
