@@ -11,6 +11,7 @@ import java.io.File;
 public class TagerMaintenanceWorker extends Worker {
     private static final long CAMERA_MAX_AGE_MS = 24L * 60L * 60L * 1000L;
     private static final long WEBVIEW_TEMP_MAX_AGE_MS = 7L * 24L * 60L * 60L * 1000L;
+    private static final long CRASH_HEALTH_MAX_AGE_MS = 30L * 24L * 60L * 60L * 1000L;
 
     public TagerMaintenanceWorker(@NonNull Context appContext, @NonNull WorkerParameters workerParams) {
         super(appContext, workerParams);
@@ -24,6 +25,7 @@ public class TagerMaintenanceWorker extends Worker {
             cleanupOlderThan(new File(context.getCacheDir(), "camera"), CAMERA_MAX_AGE_MS);
             cleanupOlderThan(new File(context.getCacheDir(), "WebView"), WEBVIEW_TEMP_MAX_AGE_MS);
             cleanupEmptyDirectories(context.getCacheDir());
+            TagerCrashRecorder.clearStale(context, CRASH_HEALTH_MAX_AGE_MS);
             return Result.success();
         } catch (RuntimeException error) {
             return Result.retry();
