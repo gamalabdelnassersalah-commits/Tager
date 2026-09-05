@@ -2,6 +2,8 @@ package com.tager.marketplace;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -33,6 +35,7 @@ public class TagerSettingsActivity extends Activity {
     private static final int TEST_NOTIFICATION_ID = 730100;
 
     private TextView notificationStatus;
+    private TextView channelStatus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -92,6 +95,14 @@ public class TagerSettingsActivity extends Activity {
         LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(-1, -2);
         statusParams.topMargin = dp(6);
         card.addView(notificationStatus, statusParams);
+
+        channelStatus = new TextView(this);
+        channelStatus.setTextSize(13f);
+        channelStatus.setTextColor(getColor(R.color.tager_text_muted));
+        channelStatus.setLineSpacing(0f, 1.15f);
+        LinearLayout.LayoutParams channelParams = new LinearLayout.LayoutParams(-1, -2);
+        channelParams.topMargin = dp(6);
+        card.addView(channelStatus, channelParams);
 
         Button enable = actionButton("تفعيل الإشعارات");
         enable.setOnClickListener(v -> enableNotifications());
@@ -255,9 +266,7 @@ public class TagerSettingsActivity extends Activity {
     }
 
     private String buildDiagnosticsReport() {
-        boolean permissionGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
-                || ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                == PackageManager.PERMISSION_GRANTED;
+        boolean permissionGranted = notificationPermissionGranted();
         boolean notificationsEnabled = permissionGranted
                 && NotificationManagerCompat.from(this).areNotificationsEnabled();
 
@@ -270,6 +279,9 @@ public class TagerSettingsActivity extends Activity {
                 .append("\nNotifications: ").append(notificationsEnabled ? "enabled" : "disabled");
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            report.append("\nChannels: orders=").append(channelEnabled(TagerApplication.CHANNEL_ORDERS))
+                    .append(", messages=").append(channelEnabled(TagerApplication.CHANNEL_MESSAGES))
+                    .append(", downloads=").append(channelEnabled(TagerApplication.CHANNEL_DOWNLOADS));
             try {
                 PackageInfo webView = WebView.getCurrentWebViewPackage();
                 if (webView != null) {
@@ -296,16 +308,41 @@ public class TagerSettingsActivity extends Activity {
                 Toast.LENGTH_SHORT).show();
     }
 
-    private void refreshNotificationStatus() {
-        if (notificationStatus == null) return;
-        boolean permissionGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+    private boolean notificationPermissionGranted() {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
                 || ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 == PackageManager.PERMISSION_GRANTED;
-        boolean enabled = permissionGranted && NotificationManagerCompat.from(this).areNotificationsEnabled();
+    }
+
+    private void refreshNotificationStatus() {
+        if (notificationStatus == null) return;
+        boolean enabled = notificationPermissionGranted()
+                && NotificationManagerCompat.from(this).areNotificationsEnabled();
         notificationStatus.setText(enabled
-                ? "الحالة: مفعلة — Android يسمح لتاجر بإظهار الإشعارات."
-                : "الحالة: غير مفعلة — يمكنك تفعيلها من الزر أدناه.");
+                ? "الحالة العامة: مفعلة — Android يسمح لتاجر بإظهار الإشعارات."
+                : "الحالة العامة: غير مفعلة — يمكنك تفعيلها من الزر أدناه.");
         notificationStatus.setTextColor(getColor(enabled ? R.color.tager_teal : R.color.tager_orange));
+
+        if (channelStatus == null) return;
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            channelStatus.setText("قنوات الإشعارات المنفصلة متاحة من Android 8 فأحدث.");
+            return;
+        }
+        channelStatus.setText("الطلبات: " + channelLabel(TagerApplication.CHANNEL_ORDERS)
+                + "  •  الرسائل: " + channelLabel(TagerApplication.CHANNEL_MESSAGES)
+                + "  •  التنزيلات: " + channelLabel(TagerApplication.CHANNEL_DOWNLOADS));
+    }
+
+    private String channelLabel(String channelId) {
+        return channelEnabled(channelId) ? "مفعلة" : "متوقفة";
+    }
+
+    private boolean channelEnabled(String channelId) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true;
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager == null) return false;
+        NotificationChannel channel = manager.getNotificationChannel(channelId);
+        return channel != null && channel.getImportance() != NotificationManager.IMPORTANCE_NONE;
     }
 
     private void openNotificationSettings() {
