@@ -171,6 +171,7 @@ public class TagerDownloadsActivity extends Activity {
             int titleCol = cursor.getColumnIndex(DownloadManager.COLUMN_TITLE);
             int descriptionCol = cursor.getColumnIndex(DownloadManager.COLUMN_DESCRIPTION);
             int statusCol = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS);
+            int reasonCol = cursor.getColumnIndex(DownloadManager.COLUMN_REASON);
             int currentCol = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR);
             int totalCol = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES);
             int mimeCol = cursor.getColumnIndex(DownloadManager.COLUMN_MEDIA_TYPE);
@@ -183,6 +184,7 @@ public class TagerDownloadsActivity extends Activity {
                 item.id = cursor.getLong(idCol);
                 item.title = titleCol >= 0 ? cursor.getString(titleCol) : null;
                 item.status = cursor.getInt(statusCol);
+                item.reason = reasonCol >= 0 ? cursor.getInt(reasonCol) : 0;
                 item.currentBytes = currentCol >= 0 ? cursor.getLong(currentCol) : -1L;
                 item.totalBytes = totalCol >= 0 ? cursor.getLong(totalCol) : -1L;
                 item.mimeType = mimeCol >= 0 ? cursor.getString(mimeCol) : null;
@@ -266,7 +268,8 @@ public class TagerDownloadsActivity extends Activity {
 
     private String statusText(DownloadItem item) {
         switch (item.status) {
-            case DownloadManager.STATUS_PENDING: return "في انتظار بدء التنزيل";
+            case DownloadManager.STATUS_PENDING:
+                return "في انتظار بدء التنزيل";
             case DownloadManager.STATUS_RUNNING:
                 if (item.totalBytes > 0L && item.currentBytes >= 0L) {
                     long percent = Math.min(100L, (item.currentBytes * 100L) / item.totalBytes);
@@ -274,12 +277,50 @@ public class TagerDownloadsActivity extends Activity {
                             + " / " + formatBytes(item.totalBytes);
                 }
                 return "جاري التنزيل";
-            case DownloadManager.STATUS_PAUSED: return "التنزيل متوقف مؤقتًا";
+            case DownloadManager.STATUS_PAUSED:
+                return "التنزيل متوقف مؤقتًا — " + pausedReason(item.reason);
             case DownloadManager.STATUS_SUCCESSFUL:
                 return "مكتمل" + (item.totalBytes > 0L ? "  •  " + formatBytes(item.totalBytes) : "");
             case DownloadManager.STATUS_FAILED:
-                return "فشل التنزيل — يمكنك إعادة المحاولة من صفحة الملف في تاجر";
-            default: return "حالة غير معروفة";
+                return "فشل التنزيل — " + failedReason(item.reason);
+            default:
+                return "حالة غير معروفة";
+        }
+    }
+
+    private String pausedReason(int reason) {
+        switch (reason) {
+            case DownloadManager.PAUSED_WAITING_FOR_NETWORK:
+                return "في انتظار اتصال بالإنترنت";
+            case DownloadManager.PAUSED_QUEUED_FOR_WIFI:
+                return "في انتظار شبكة Wi‑Fi مناسبة";
+            case DownloadManager.PAUSED_WAITING_TO_RETRY:
+                return "سيحاول Android مرة أخرى تلقائيًا";
+            default:
+                return "سيتم استكماله عند توفر الظروف المناسبة";
+        }
+    }
+
+    private String failedReason(int reason) {
+        switch (reason) {
+            case DownloadManager.ERROR_INSUFFICIENT_SPACE:
+                return "المساحة المتاحة غير كافية";
+            case DownloadManager.ERROR_DEVICE_NOT_FOUND:
+                return "مكان التخزين غير متاح";
+            case DownloadManager.ERROR_FILE_ALREADY_EXISTS:
+                return "يوجد ملف بنفس الاسم";
+            case DownloadManager.ERROR_CANNOT_RESUME:
+                return "تعذر استكمال التنزيل؛ أعد المحاولة";
+            case DownloadManager.ERROR_HTTP_DATA_ERROR:
+                return "انقطع نقل البيانات من الخادم";
+            case DownloadManager.ERROR_TOO_MANY_REDIRECTS:
+                return "تعذر الوصول للملف بسبب تحويلات كثيرة";
+            case DownloadManager.ERROR_UNHANDLED_HTTP_CODE:
+                return "الخادم رفض طلب التنزيل";
+            case DownloadManager.ERROR_FILE_ERROR:
+                return "تعذر حفظ الملف على الجهاز";
+            default:
+                return "تعذر تنزيل الملف؛ أعد المحاولة من تاجر";
         }
     }
 
@@ -355,6 +396,7 @@ public class TagerDownloadsActivity extends Activity {
         String title;
         String mimeType;
         int status;
+        int reason;
         long currentBytes;
         long totalBytes;
         long modifiedAt;
