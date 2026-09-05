@@ -1,0 +1,125 @@
+name: Build Tager Android 2.1.1 Link Security
+
+on:
+  push:
+    branches: [ android-v2.1.1-link-security ]
+    paths:
+      - 'android-app/**'
+      - '.github/workflows/tager-android-v211-link-security.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 36
+        run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Lint, unit tests and release build
+        working-directory: android-app
+        run: gradle --no-daemon :app:lintRelease :app:testReleaseUnitTest :app:assembleRelease :app:bundleRelease
+
+      - name: Verify real unit test execution
+        run: |
+          REPORT=android-app/app/build/test-results/testReleaseUnitTest/TEST-com.tager.marketplace.TagerTrustedLinkPolicyTest.xml
+          test -f "$REPORT"
+          grep -q 'tests="9"' "$REPORT"
+          grep -q 'failures="0"' "$REPORT"
+          grep -q 'errors="0"' "$REPORT"
+
+      - name: Verify 2.1.1 identity
+        run: |
+          BUILD=android-app/app/build.gradle
+          grep -q "versionCode 20" "$BUILD"
+          grep -q "versionName '2.1.1'" "$BUILD"
+          grep -q "applicationId 'com.tager.marketplace'" "$BUILD"
+          grep -q "targetSdk 36" "$BUILD"
+
+      - name: Verify link security policy
+        run: |
+          POLICY=android-app/app/src/main/java/com/tager/marketplace/TagerTrustedLinkPolicy.java
+          ROUTER=android-app/app/src/main/java/com/tager/marketplace/TagerLinkRouter.java
+          TEST=android-app/app/src/test/java/com/tager/marketplace/TagerTrustedLinkPolicyTest.java
+          grep -q 'PRODUCTION_HOST = "tager-new.vercel.app"' "$POLICY"
+          grep -q 'getRawUserInfo' "$POLICY"
+          grep -q 'port != -1 && port != 443' "$POLICY"
+          grep -q 'containsEncodedControl' "$POLICY"
+          grep -q 'MAX_URL_LENGTH' "$POLICY"
+          grep -q 'TagerTrustedLinkPolicy.isTrustedUrl' "$ROUTER"
+          grep -q 'rejectsLookalikeHostSuffix' "$TEST"
+          grep -q 'rejectsUserInfoAuthorityConfusion' "$TEST"
+          grep -q 'extractsTrustedUrlFromArabicShareText' "$TEST"
+
+      - name: Verify permission budget remains minimal
+        run: |
+          MANIFEST=android-app/app/src/main/AndroidManifest.xml
+          test "$(grep -c '<uses-permission' "$MANIFEST")" -eq 3
+          grep -q 'android.permission.INTERNET' "$MANIFEST"
+          grep -q 'android.permission.ACCESS_NETWORK_STATE' "$MANIFEST"
+          grep -q 'android.permission.POST_NOTIFICATIONS' "$MANIFEST"
+          if grep -Eq 'READ_CONTACTS|READ_SMS|SEND_SMS|RECORD_AUDIO|ACCESS_FINE_LOCATION|ACCESS_COARSE_LOCATION|READ_PHONE_STATE|AD_ID' "$MANIFEST"; then
+            echo 'Unexpected high-risk permission detected' >&2
+            exit 1
+          fi
+
+      - name: Verify existing production hardening remains
+        run: |
+          SRC=android-app/app/src/main/java/com/tager/marketplace/TagerActivity.java
+          MANIFEST=android-app/app/src/main/AndroidManifest.xml
+          grep -q 'mainFrameLoadFailed' "$SRC"
+          grep -q 'onPageCommitVisible' "$SRC"
+          grep -q 'restoreLastGoodPage' "$SRC"
+          grep -q 'camera.setClipData' "$SRC"
+          grep -q 'releaseCameraUriPermissions' "$SRC"
+          grep -q 'setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW)' "$SRC"
+          grep -q 'WebView.setWebContentsDebuggingEnabled(false)' "$SRC"
+          grep -q 'TagerShareReceiverActivity' "$MANIFEST"
+          grep -q 'android:allowBackup="false"' "$MANIFEST"
+          grep -q 'android:usesCleartextTraffic="false"' "$MANIFEST"
+
+      - name: Verify unsigned APK alignment
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          "$SDK_ROOT/build-tools/35.0.0/zipalign" -c -P 16 -v 4 android-app/app/build/outputs/apk/release/app-release-unsigned.apk
+
+      - name: Prepare outputs
+        run: |
+          cp android-app/app/build/outputs/apk/release/app-release-unsigned.apk Tager-v2.1.1-link-security-unsigned.apk
+          cp android-app/app/build/outputs/bundle/release/app-release.aab Tager-v2.1.1-link-security-unsigned.aab
+          sha256sum Tager-v2.1.1-link-security-unsigned.apk > Tager-v2.1.1-link-security-unsigned.apk.sha256
+          sha256sum Tager-v2.1.1-link-security-unsigned.aab > Tager-v2.1.1-link-security-unsigned.aab.sha256
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tager-v2.1.1-link-security-unsigned-APK
+          path: |
+            Tager-v2.1.1-link-security-unsigned.apk
+            Tager-v2.1.1-link-security-unsigned.apk.sha256
+          retention-days: 30
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tager-v2.1.1-link-security-unsigned-AAB
+          path: |
+            Tager-v2.1.1-link-security-unsigned.aab
+            Tager-v2.1.1-link-security-unsigned.aab.sha256
+          retention-days: 30
