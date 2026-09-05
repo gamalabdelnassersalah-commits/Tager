@@ -26,6 +26,7 @@ import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.PermissionRequest;
 import android.webkit.RenderProcessGoneDetail;
+import android.webkit.SafeBrowsingResponse;
 import android.webkit.SslErrorHandler;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
@@ -93,6 +94,7 @@ public class TagerActivity extends Activity {
     private TextView navCart;
     private ValueCallback<Uri[]> fileCallback;
     private Uri cameraOutputUri;
+    private File cameraOutputFile;
     private SharedPreferences preferences;
     private ConnectivityManager connectivityManager;
     private ConnectivityManager.NetworkCallback networkCallback;
@@ -272,6 +274,18 @@ public class TagerActivity extends Activity {
         navSuppliers.setOnClickListener(v -> navigateFromButton(v, "suppliers"));
         navTrack.setOnClickListener(v -> navigateFromButton(v, "track"));
         navCart.setOnClickListener(v -> navigateFromButton(v, "cart"));
+
+        View.OnLongClickListener shareCurrentPage = v -> {
+            v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+            shareCurrentPage();
+            return true;
+        };
+        navHome.setOnLongClickListener(shareCurrentPage);
+        navProducts.setOnLongClickListener(shareCurrentPage);
+        navSuppliers.setOnLongClickListener(shareCurrentPage);
+        navTrack.setOnLongClickListener(shareCurrentPage);
+        navCart.setOnLongClickListener(shareCurrentPage);
+
         updateSelectedNavigation(resolveRequestedPage(getIntent()));
     }
 
@@ -491,6 +505,20 @@ public class TagerActivity extends Activity {
             }
 
             @Override
+            public void onSafeBrowsingHit(
+                    WebView view,
+                    WebResourceRequest request,
+                    int threatType,
+                    SafeBrowsingResponse callback) {
+                mainFrameLoadFailed = true;
+                cancelSlowLoadWarning();
+                finishNativeRefresh();
+                showLoading(false);
+                showStatus("تم حظر صفحة غير آمنة لحماية حسابك وبياناتك");
+                if (callback != null) callback.backToSafety(true);
+            }
+
+            @Override
             public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
                 mainFrameLoadFailed = true;
                 cancelSlowLoadWarning();
@@ -657,6 +685,7 @@ public class TagerActivity extends Activity {
 
         try {
             if ("tager".equals(scheme)) {
+                if (handleTagerCommand(uri)) return true;
                 navigateTo(resolvePageFromTagerUri(uri));
                 return true;
             }
@@ -730,6 +759,42 @@ public class TagerActivity extends Activity {
         }
     }
 
+    private boolean handleTagerCommand(Uri uri) {
+        if (uri == null) return false;
+        String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+        if (!"share".equals(host)) return false;
+
+        String url = uri.getQueryParameter("url");
+        String text = uri.getQueryParameter("text");
+        if (url == null || !isTagerUrl(url)) {
+            url = webView == null ? getPageUrl("home") : webView.getUrl();
+        }
+        shareText(text, url);
+        return true;
+    }
+
+    private void shareCurrentPage() {
+        String url = webView == null ? null : webView.getUrl();
+        if (!isTagerUrl(url)) {
+            url = getPageUrl(preferences.getString(PREF_LAST_PAGE, "home"));
+        }
+        shareText("Tager | تاجر", url);
+    }
+
+    private void shareText(String text, String url) {
+        try {
+            String safeText = text == null || text.trim().isEmpty() ? "Tager | تاجر" : text.trim();
+            String safeUrl = isTagerUrl(url) ? url : HOME_BASE_URL;
+            Intent share = new Intent(Intent.ACTION_SEND);
+            share.setType("text/plain");
+            share.putExtra(Intent.EXTRA_SUBJECT, "Tager | تاجر");
+            share.putExtra(Intent.EXTRA_TEXT, safeText + "\n" + safeUrl);
+            startActivity(Intent.createChooser(share, "مشاركة من تاجر"));
+        } catch (RuntimeException error) {
+            Toast.makeText(this, "تعذر فتح المشاركة", Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private String resolvePageFromTagerUri(Uri uri) {
         String host = uri == null ? null : uri.getHost();
         if (host != null && !host.isEmpty() && !"open".equalsIgnoreCase(host)) {
@@ -749,6 +814,7 @@ public class TagerActivity extends Activity {
             String fileName = URLUtil.guessFileName(url, contentDisposition, mimeType)
                     .replaceAll("[\\\\/:*?\"<>|]", "_");
             if (fileName.trim().isEmpty()) fileName = "tager-download";
+            if (fileName.length() > 120) fileName = fileName.substring(0, 120);
 
             DownloadManager.Request request = new DownloadManager.Request(uri);
             if (mimeType != null && !mimeType.isEmpty()) request.setMimeType(mimeType);
@@ -792,6 +858,7 @@ public class TagerActivity extends Activity {
         } catch (RuntimeException ignored) {
         }
         releaseCameraUriPermissions();
+        deletePendingCameraFile();
         cameraOutputUri = null;
         if (message != null && !message.isEmpty()) {
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
@@ -805,7 +872,10 @@ public class TagerActivity extends Activity {
         boolean acceptsImages = acceptsImages(acceptTypes);
 
         Intent fileIntent;
-        try {
+        if (acceptsImages && !allowMultiple && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            fileIntent = new Intent(MediaStore.ACTION_PICK_IMAGES);
+            fileIntent.setType("image/*");
+        } else try {
             fileIntent = params == null ? null : params.createIntent();
             if (fileIntent == null) throw new IllegalStateException("No file intent");
             fileIntent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -824,6 +894,7 @@ public class TagerActivity extends Activity {
         if (params != null && params.isCaptureEnabled() && cameraIntent != null) {
             if (tryStartFileChooser(cameraIntent)) return;
             releaseCameraUriPermissions();
+            deletePendingCameraFile();
             cameraOutputUri = null;
             cameraIntent = null;
         }
@@ -882,6 +953,7 @@ public class TagerActivity extends Activity {
             File dir = new File(getCacheDir(), "camera");
             if (!dir.exists() && !dir.mkdirs()) return null;
             File image = File.createTempFile("tager_camera_", ".jpg", dir);
+            cameraOutputFile = image;
             cameraOutputUri = FileProvider.getUriForFile(
                     this,
                     BuildConfig.APPLICATION_ID + ".fileprovider",
@@ -903,6 +975,7 @@ public class TagerActivity extends Activity {
             return camera;
         } catch (IOException | RuntimeException ignored) {
             releaseCameraUriPermissions();
+            deletePendingCameraFile();
             cameraOutputUri = null;
             return null;
         }
@@ -915,6 +988,16 @@ public class TagerActivity extends Activity {
                     cameraOutputUri,
                     Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
         } catch (Exception ignored) {
+        }
+    }
+
+    private void deletePendingCameraFile() {
+        File pending = cameraOutputFile;
+        cameraOutputFile = null;
+        if (pending == null) return;
+        try {
+            if (pending.isFile()) pending.delete();
+        } catch (RuntimeException ignored) {
         }
     }
 
@@ -956,11 +1039,17 @@ public class TagerActivity extends Activity {
             result = null;
         }
 
+        boolean usedCameraOutput = result != null
+                && cameraOutputUri != null
+                && result.length == 1
+                && cameraOutputUri.equals(result[0]);
         try {
             callback.onReceiveValue(result);
         } catch (RuntimeException ignored) {
         } finally {
             releaseCameraUriPermissions();
+            if (!usedCameraOutput) deletePendingCameraFile();
+            else cameraOutputFile = null;
             cameraOutputUri = null;
         }
     }
