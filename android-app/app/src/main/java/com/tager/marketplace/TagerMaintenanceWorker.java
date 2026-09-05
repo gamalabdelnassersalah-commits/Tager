@@ -10,7 +10,6 @@ import java.io.File;
 
 public class TagerMaintenanceWorker extends Worker {
     private static final long CAMERA_MAX_AGE_MS = 24L * 60L * 60L * 1000L;
-    private static final long WEBVIEW_TEMP_MAX_AGE_MS = 7L * 24L * 60L * 60L * 1000L;
     private static final long CRASH_HEALTH_MAX_AGE_MS = 30L * 24L * 60L * 60L * 1000L;
 
     public TagerMaintenanceWorker(@NonNull Context appContext, @NonNull WorkerParameters workerParams) {
@@ -22,9 +21,12 @@ public class TagerMaintenanceWorker extends Worker {
     public Result doWork() {
         try {
             Context context = getApplicationContext();
-            cleanupOlderThan(new File(context.getCacheDir(), "camera"), CAMERA_MAX_AGE_MS);
-            cleanupOlderThan(new File(context.getCacheDir(), "WebView"), WEBVIEW_TEMP_MAX_AGE_MS);
-            cleanupEmptyDirectories(context.getCacheDir());
+            // Only touch cache paths created and owned by Tager itself.
+            // Chromium/WebView manages its own cache lifecycle and must not be
+            // modified behind the renderer while it may be active.
+            File cameraDir = new File(context.getCacheDir(), "camera");
+            cleanupOlderThan(cameraDir, CAMERA_MAX_AGE_MS);
+            cleanupEmptyDirectories(cameraDir);
             TagerCrashRecorder.clearStale(context, CRASH_HEALTH_MAX_AGE_MS);
             return Result.success();
         } catch (RuntimeException error) {
@@ -61,6 +63,7 @@ public class TagerMaintenanceWorker extends Worker {
     }
 
     private void deleteIfEmpty(File directory) {
+        if (directory == null || !directory.isDirectory()) return;
         File[] children = directory.listFiles();
         if (children != null && children.length == 0) directory.delete();
     }
