@@ -70,11 +70,12 @@ final class TagerNotificationCenter {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channelId)
-                .setSmallIcon(R.mipmap.ic_launcher)
+                .setSmallIcon(R.drawable.ic_notification_tager)
                 .setContentTitle(safeTitle)
                 .setContentText(safeMessage)
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(safeMessage))
                 .setPriority(priority)
+                .setCategory(NotificationCompat.CATEGORY_STATUS)
                 .setAutoCancel(true)
                 .setOnlyAlertOnce(true)
                 .setContentIntent(pendingIntent);
