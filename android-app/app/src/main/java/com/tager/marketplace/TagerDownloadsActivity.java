@@ -37,13 +37,14 @@ public class TagerDownloadsActivity extends Activity {
     private final Runnable autoRefresh = new Runnable() {
         @Override public void run() {
             refreshDownloads();
-            refreshHandler.postDelayed(this, AUTO_REFRESH_MS);
+            scheduleActiveRefresh();
         }
     };
 
     private DownloadManager downloadManager;
     private LinearLayout listContainer;
     private TextView summaryView;
+    private boolean hasActiveDownloads;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -57,8 +58,7 @@ public class TagerDownloadsActivity extends Activity {
     @Override protected void onResume() {
         super.onResume();
         refreshDownloads();
-        refreshHandler.removeCallbacks(autoRefresh);
-        refreshHandler.postDelayed(autoRefresh, AUTO_REFRESH_MS);
+        scheduleActiveRefresh();
     }
 
     @Override protected void onPause() {
@@ -69,6 +69,11 @@ public class TagerDownloadsActivity extends Activity {
     @Override protected void onDestroy() {
         refreshHandler.removeCallbacksAndMessages(null);
         super.onDestroy();
+    }
+
+    private void scheduleActiveRefresh() {
+        refreshHandler.removeCallbacks(autoRefresh);
+        if (hasActiveDownloads) refreshHandler.postDelayed(autoRefresh, AUTO_REFRESH_MS);
     }
 
     private View buildContent() {
@@ -101,7 +106,10 @@ public class TagerDownloadsActivity extends Activity {
         refresh.setText("تحديث");
         refresh.setAllCaps(false);
         refresh.setMinHeight(dp(48));
-        refresh.setOnClickListener(v -> refreshDownloads());
+        refresh.setOnClickListener(v -> {
+            refreshDownloads();
+            scheduleActiveRefresh();
+        });
         actions.addView(refresh, new LinearLayout.LayoutParams(0, dp(52), 1f));
 
         Button openFolder = new Button(this);
@@ -134,6 +142,7 @@ public class TagerDownloadsActivity extends Activity {
         listContainer.removeAllViews();
         List<DownloadItem> items = loadDownloads();
         if (items.isEmpty()) {
+            hasActiveDownloads = false;
             summaryView.setText("لا توجد تنزيلات من تاجر حتى الآن");
             TextView empty = new TextView(this);
             empty.setText("أي ملف يتم تنزيله من داخل تاجر سيظهر هنا تلقائيًا.");
@@ -147,13 +156,12 @@ public class TagerDownloadsActivity extends Activity {
 
         int active = 0, complete = 0, failed = 0;
         for (DownloadItem item : items) {
-            if (item.status == DownloadManager.STATUS_RUNNING
-                    || item.status == DownloadManager.STATUS_PENDING
-                    || item.status == DownloadManager.STATUS_PAUSED) active++;
+            if (isActive(item.status)) active++;
             else if (item.status == DownloadManager.STATUS_SUCCESSFUL) complete++;
             else if (item.status == DownloadManager.STATUS_FAILED) failed++;
             listContainer.addView(buildDownloadRow(item));
         }
+        hasActiveDownloads = active > 0;
         summaryView.setText("الكل: " + items.size() + "  •  جاري: " + active
                 + "  •  مكتمل: " + complete + (failed > 0 ? "  •  فشل: " + failed : ""));
     }
@@ -316,6 +324,7 @@ public class TagerDownloadsActivity extends Activity {
                 Toast.makeText(this, "التنزيل لم يعد موجودًا", Toast.LENGTH_SHORT).show();
             }
             refreshDownloads();
+            scheduleActiveRefresh();
         } catch (SecurityException | RuntimeException error) {
             Toast.makeText(this, "تعذر حذف هذا التنزيل", Toast.LENGTH_SHORT).show();
         }
@@ -418,6 +427,7 @@ public class TagerDownloadsActivity extends Activity {
         if (uri == null) {
             Toast.makeText(this, "الملف لم يعد متاحًا في التنزيلات", Toast.LENGTH_SHORT).show();
             refreshDownloads();
+            scheduleActiveRefresh();
             return null;
         }
         String mime = item.mimeType;
