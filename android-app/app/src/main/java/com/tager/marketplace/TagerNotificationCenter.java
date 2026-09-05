@@ -79,7 +79,12 @@ final class TagerNotificationCenter {
                 .setOnlyAlertOnce(true)
                 .setContentIntent(pendingIntent);
 
-        NotificationManagerCompat.from(context).notify(notificationId, builder.build());
+        try {
+            NotificationManagerCompat.from(context).notify(notificationId, builder.build());
+        } catch (SecurityException ignored) {
+            // Permission can be revoked between canNotify() and notify().
+            // Failing closed keeps notification delivery safe without crashing Tager.
+        }
     }
 
     private static String sanitizePage(String page) {
