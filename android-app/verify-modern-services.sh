@@ -14,6 +14,7 @@ SHORTCUTS="app/src/main/res/xml/shortcuts.xml"
 ACTIVITY="app/src/main/java/com/tager/marketplace/TagerActivity.java"
 NOTIFICATION_ICON="app/src/main/res/drawable/ic_notification_tager.xml"
 DOWNLOAD_ICON="app/src/main/res/drawable/ic_shortcut_downloads.xml"
+SETTINGS_ICON="app/src/main/res/drawable/ic_shortcut_settings.xml"
 
 # Core native dependencies and external navigation protection.
 grep -q "androidx.browser:browser:1.10.0" "$BUILD"
@@ -30,7 +31,6 @@ grep -q 'ExistingPeriodicWorkPolicy.UPDATE' "$APP"
 grep -q 'TagerMaintenanceWorker.class' "$APP"
 grep -q 'class TagerMaintenanceWorker' "$WORKER"
 grep -q 'TagerCrashRecorder.clearStale' "$WORKER"
-# Never manipulate Chromium/WebView-owned cache paths behind the renderer.
 if grep -q '"WebView"' "$WORKER"; then
   echo 'Maintenance must not touch WebView-owned cache paths' >&2
   exit 1
@@ -102,7 +102,6 @@ if grep -Eq 'COLUMN_URI|COLUMN_LOCAL_URI|CookieManager|getCookie\(' "$DOWNLOADS"
   echo 'Download center must not read source URLs or cookies' >&2
   exit 1
 fi
-# It may be externally routed only through the exact Tager downloads deep link.
 grep -q 'android:name=".TagerDownloadsActivity"' "$MANIFEST"
 grep -A10 'android:name=".TagerDownloadsActivity"' "$MANIFEST" | grep -q 'android:exported="true"'
 grep -A10 'android:name=".TagerDownloadsActivity"' "$MANIFEST" | grep -q 'android:scheme="tager" android:host="downloads"'
@@ -117,6 +116,9 @@ for page in products track cart; do
 done
 grep -q 'android:shortcutId="downloads"' "$SHORTCUTS"
 grep -q 'TagerDownloadsActivity' "$SHORTCUTS"
+grep -q 'android:shortcutId="settings"' "$SHORTCUTS"
+grep -q 'TagerSettingsActivity' "$SHORTCUTS"
+test -f "$SETTINGS_ICON"
 
 # Keep one native refresh implementation; prevent the old touch-listener path.
 grep -q 'TagerSwipeRefreshLayout' 'app/src/main/res/layout/activity_main.xml'
