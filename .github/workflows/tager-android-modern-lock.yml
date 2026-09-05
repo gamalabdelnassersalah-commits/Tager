@@ -1,0 +1,19 @@
+name: Verify Tager Modern Android Locks
+
+on:
+  push:
+    branches: [ android-v2.0-ux-compat ]
+    paths:
+      - 'android-app/**'
+      - '.github/workflows/tager-android-modern-lock.yml'
+  workflow_dispatch:
+
+jobs:
+  verify-modern-services:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Verify modern Android services
+        working-directory: android-app
+        run: bash verify-modern-services.sh
