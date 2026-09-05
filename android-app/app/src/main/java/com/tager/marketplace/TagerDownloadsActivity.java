@@ -325,7 +325,7 @@ public class TagerDownloadsActivity extends Activity {
             }
             refreshDownloads();
             scheduleActiveRefresh();
-        } catch (SecurityException | RuntimeException error) {
+        } catch (RuntimeException error) {
             Toast.makeText(this, "تعذر حذف هذا التنزيل", Toast.LENGTH_SHORT).show();
         }
     }
