@@ -25,7 +25,7 @@ final class TagerTrustedLinkPolicy {
         String candidate = value.trim();
         if (candidate.isEmpty() || candidate.length() > MAX_URL_LENGTH) return false;
         if (containsControlCharacter(candidate) || containsEncodedControl(candidate)) return false;
-        if (candidate.indexOf('\\\\') >= 0) return false;
+        if (candidate.indexOf('\\') >= 0) return false;
 
         try {
             URI uri = new URI(candidate);
