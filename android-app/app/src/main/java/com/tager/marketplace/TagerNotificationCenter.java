@@ -44,7 +44,7 @@ final class TagerNotificationCenter {
                 notificationId,
                 title,
                 message,
-                page,
+                Uri.parse("tager://" + TagerLinkRouter.sanitizePage(page)),
                 NotificationCompat.PRIORITY_HIGH);
     }
 
@@ -55,7 +55,41 @@ final class TagerNotificationCenter {
                 notificationId,
                 title,
                 message,
-                page,
+                Uri.parse("tager://" + TagerLinkRouter.sanitizePage(page)),
+                NotificationCompat.PRIORITY_DEFAULT);
+    }
+
+    static void showOrderNotificationForUrl(
+            Context context,
+            int notificationId,
+            String title,
+            String message,
+            String url,
+            String fallbackPage) {
+        show(
+                context,
+                TagerApplication.CHANNEL_ORDERS,
+                notificationId,
+                title,
+                message,
+                TagerLinkRouter.safeNotificationTarget(url, fallbackPage),
+                NotificationCompat.PRIORITY_HIGH);
+    }
+
+    static void showMessageNotificationForUrl(
+            Context context,
+            int notificationId,
+            String title,
+            String message,
+            String url,
+            String fallbackPage) {
+        show(
+                context,
+                TagerApplication.CHANNEL_MESSAGES,
+                notificationId,
+                title,
+                message,
+                TagerLinkRouter.safeNotificationTarget(url, fallbackPage),
                 NotificationCompat.PRIORITY_DEFAULT);
     }
 
@@ -65,15 +99,15 @@ final class TagerNotificationCenter {
             int notificationId,
             String title,
             String message,
-            String page,
+            Uri target,
             int priority) {
         if (!canNotifyChannel(context, channelId)) return;
 
         String safeTitle = title == null || title.trim().isEmpty() ? "Tager | تاجر" : title.trim();
         String safeMessage = message == null ? "" : message.trim();
-        String safePage = sanitizePage(page);
+        Uri safeTarget = target == null ? Uri.parse("tager://home") : target;
 
-        Intent open = new Intent(Intent.ACTION_VIEW, Uri.parse("tager://" + safePage), context, TagerActivity.class);
+        Intent open = new Intent(Intent.ACTION_VIEW, safeTarget, context, TagerActivity.class);
         open.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 context,
@@ -96,12 +130,6 @@ final class TagerNotificationCenter {
             NotificationManagerCompat.from(context).notify(notificationId, builder.build());
         } catch (SecurityException ignored) {
             // Permission or channel state can change between validation and notify().
-            // Failing closed keeps notification delivery safe without crashing Tager.
         }
-    }
-
-    private static String sanitizePage(String page) {
-        if (page == null || !page.matches("[A-Za-z0-9_-]{1,64}")) return "home";
-        return page;
     }
 }

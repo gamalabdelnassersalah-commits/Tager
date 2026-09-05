@@ -1,0 +1,118 @@
+name: Build Tager Android 2.1.0 Smart Links
+
+on:
+  push:
+    branches: [ android-v2.1-smart-links ]
+    paths:
+      - 'android-app/**'
+      - '.github/workflows/tager-android-v21-smart-links.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 36
+        run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Lint, tests and release build
+        working-directory: android-app
+        run: gradle --no-daemon :app:lintRelease :app:testReleaseUnitTest :app:assembleRelease :app:bundleRelease
+
+      - name: Verify 2.1.0 identity
+        run: |
+          BUILD=android-app/app/build.gradle
+          grep -q "versionCode 19" "$BUILD"
+          grep -q "versionName '2.1.0'" "$BUILD"
+          grep -q "applicationId 'com.tager.marketplace'" "$BUILD"
+          grep -q "targetSdk 36" "$BUILD"
+
+      - name: Verify smart-link share integration
+        run: |
+          MANIFEST=android-app/app/src/main/AndroidManifest.xml
+          ROUTER=android-app/app/src/main/java/com/tager/marketplace/TagerLinkRouter.java
+          SHARE=android-app/app/src/main/java/com/tager/marketplace/TagerShareReceiverActivity.java
+          NOTIFY=android-app/app/src/main/java/com/tager/marketplace/TagerNotificationCenter.java
+          grep -q 'TagerShareReceiverActivity' "$MANIFEST"
+          grep -q 'android.intent.action.SEND' "$MANIFEST"
+          grep -q 'android:mimeType="text/plain"' "$MANIFEST"
+          grep -q 'PRODUCTION_HOST = "tager-new.vercel.app"' "$ROUTER"
+          grep -q 'isTrustedProductionUrl' "$ROUTER"
+          grep -q 'findTrustedProductionUrl' "$ROUTER"
+          grep -q 'showOrderNotificationForUrl' "$NOTIFY"
+          grep -q 'showMessageNotificationForUrl' "$NOTIFY"
+          grep -q 'TagerLinkRouter.buildOpenIntent' "$SHARE"
+
+      - name: Verify permission budget remains minimal
+        run: |
+          MANIFEST=android-app/app/src/main/AndroidManifest.xml
+          test "$(grep -c '<uses-permission' "$MANIFEST")" -eq 3
+          grep -q 'android.permission.INTERNET' "$MANIFEST"
+          grep -q 'android.permission.ACCESS_NETWORK_STATE' "$MANIFEST"
+          grep -q 'android.permission.POST_NOTIFICATIONS' "$MANIFEST"
+          if grep -Eq 'READ_CONTACTS|READ_SMS|SEND_SMS|RECORD_AUDIO|ACCESS_FINE_LOCATION|ACCESS_COARSE_LOCATION|READ_PHONE_STATE|AD_ID' "$MANIFEST"; then
+            echo 'Unexpected high-risk permission detected' >&2
+            exit 1
+          fi
+
+      - name: Verify existing production hardening remains
+        run: |
+          SRC=android-app/app/src/main/java/com/tager/marketplace/TagerActivity.java
+          MANIFEST=android-app/app/src/main/AndroidManifest.xml
+          grep -q 'mainFrameLoadFailed' "$SRC"
+          grep -q 'onPageCommitVisible' "$SRC"
+          grep -q 'restoreLastGoodPage' "$SRC"
+          grep -q 'camera.setClipData' "$SRC"
+          grep -q 'releaseCameraUriPermissions' "$SRC"
+          grep -q 'setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW)' "$SRC"
+          grep -q 'WebView.setWebContentsDebuggingEnabled(false)' "$SRC"
+          grep -q 'android:allowBackup="false"' "$MANIFEST"
+          grep -q 'android:usesCleartextTraffic="false"' "$MANIFEST"
+          grep -q 'android:enableOnBackInvokedCallback="true"' "$MANIFEST"
+
+      - name: Verify unsigned APK alignment
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          "$SDK_ROOT/build-tools/35.0.0/zipalign" -c -P 16 -v 4 android-app/app/build/outputs/apk/release/app-release-unsigned.apk
+
+      - name: Prepare outputs
+        run: |
+          cp android-app/app/build/outputs/apk/release/app-release-unsigned.apk Tager-v2.1.0-smart-links-unsigned.apk
+          cp android-app/app/build/outputs/bundle/release/app-release.aab Tager-v2.1.0-smart-links-unsigned.aab
+          sha256sum Tager-v2.1.0-smart-links-unsigned.apk > Tager-v2.1.0-smart-links-unsigned.apk.sha256
+          sha256sum Tager-v2.1.0-smart-links-unsigned.aab > Tager-v2.1.0-smart-links-unsigned.aab.sha256
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tager-v2.1.0-smart-links-unsigned-APK
+          path: |
+            Tager-v2.1.0-smart-links-unsigned.apk
+            Tager-v2.1.0-smart-links-unsigned.apk.sha256
+          retention-days: 30
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tager-v2.1.0-smart-links-unsigned-AAB
+          path: |
+            Tager-v2.1.0-smart-links-unsigned.aab
+            Tager-v2.1.0-smart-links-unsigned.aab.sha256
+          retention-days: 30

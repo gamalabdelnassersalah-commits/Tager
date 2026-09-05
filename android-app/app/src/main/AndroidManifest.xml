@@ -70,6 +70,19 @@
         </activity>
 
         <activity
+            android:name=".TagerShareReceiverActivity"
+            android:exported="true"
+            android:noHistory="true"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
+        <activity
             android:name=".TagerActivity"
             android:exported="true"
             android:launchMode="singleTask"
