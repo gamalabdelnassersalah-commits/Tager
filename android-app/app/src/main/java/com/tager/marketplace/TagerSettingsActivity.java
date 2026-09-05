@@ -42,6 +42,7 @@ public class TagerSettingsActivity extends Activity {
     private static final int TEST_NOTIFICATION_ID = 730100;
 
     private TextView healthSummaryStatus;
+    private Button healthRepairButton;
     private TextView notificationStatus;
     private TextView channelStatus;
     private TextView runtimeStatus;
@@ -135,6 +136,11 @@ public class TagerSettingsActivity extends Activity {
             Toast.makeText(this, "تم تحديث حالة تاجر", Toast.LENGTH_SHORT).show();
         });
         addButton(card, refresh);
+
+        healthRepairButton = actionButton("إصلاح المشكلة");
+        healthRepairButton.setVisibility(View.GONE);
+        healthRepairButton.setOnClickListener(v -> repairFirstHealthIssue());
+        addButton(card, healthRepairButton);
         return card;
     }
 
@@ -494,6 +500,7 @@ public class TagerSettingsActivity extends Activity {
         if (healthyCount == 4) {
             healthSummaryStatus.setText("الحالة العامة: سليمة — 4/4 مؤشرات تعمل بشكل طبيعي.\nلا توجد مشكلة محلية ظاهرة في الشبكة أو WebView أو الإشعارات أو استقرار التطبيق.");
             healthSummaryStatus.setTextColor(getColor(R.color.tager_teal));
+            if (healthRepairButton != null) healthRepairButton.setVisibility(View.GONE);
             return;
         }
 
@@ -517,6 +524,99 @@ public class TagerSettingsActivity extends Activity {
         }
         healthSummaryStatus.setText(issues.toString());
         healthSummaryStatus.setTextColor(getColor(R.color.tager_orange));
+
+        if (healthRepairButton != null) {
+            healthRepairButton.setVisibility(View.VISIBLE);
+            if (!networkHealthy) {
+                healthRepairButton.setText("فتح إعدادات الشبكة");
+            } else if (!webViewHealthy) {
+                healthRepairButton.setText("إصلاح WebView");
+            } else if (!notificationsHealthy) {
+                healthRepairButton.setText("إصلاح الإشعارات");
+            } else {
+                healthRepairButton.setText("مشاركة تقرير التشخيص");
+            }
+        }
+    }
+
+    private void repairFirstHealthIssue() {
+        NetworkHealth network = readNetworkHealth();
+        if (!network.connected || !network.validated) {
+            openNetworkSettings();
+            return;
+        }
+
+        PackageInfo webView = currentWebViewPackage();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && webView == null) {
+            openWebViewRecovery();
+            return;
+        }
+
+        boolean notificationsEnabled = notificationPermissionGranted()
+                && NotificationManagerCompat.from(this).areNotificationsEnabled();
+        boolean channelsHealthy = Build.VERSION.SDK_INT < Build.VERSION_CODES.O
+                || (channelEnabled(TagerApplication.CHANNEL_ORDERS)
+                && channelEnabled(TagerApplication.CHANNEL_MESSAGES)
+                && channelEnabled(TagerApplication.CHANNEL_DOWNLOADS));
+        if (!notificationsEnabled || !channelsHealthy) {
+            openFirstNotificationIssue();
+            return;
+        }
+
+        if (TagerCrashRecorder.snapshot(this).hasCrash()) {
+            shareDiagnostics();
+            return;
+        }
+
+        Toast.makeText(this, "لا توجد مشكلة محلية ظاهرة الآن", Toast.LENGTH_SHORT).show();
+        refreshHealthSummary();
+    }
+
+    private void openNetworkSettings() {
+        try {
+            startActivity(new Intent(Settings.ACTION_WIRELESS_SETTINGS));
+        } catch (ActivityNotFoundException | SecurityException error) {
+            openApplicationSettings();
+        }
+    }
+
+    private void openWebViewRecovery() {
+        PackageInfo webView = currentWebViewPackage();
+        if (webView != null) {
+            openCurrentWebViewSettings();
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            try {
+                startActivity(new Intent("android.settings.WEBVIEW_SETTINGS"));
+                return;
+            } catch (ActivityNotFoundException | SecurityException ignored) {
+            }
+        }
+        openApplicationSettings();
+    }
+
+    private void openFirstNotificationIssue() {
+        if (!notificationPermissionGranted()
+                || !NotificationManagerCompat.from(this).areNotificationsEnabled()) {
+            enableNotifications();
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (!channelEnabled(TagerApplication.CHANNEL_ORDERS)) {
+                openNotificationChannelSettings(TagerApplication.CHANNEL_ORDERS);
+                return;
+            }
+            if (!channelEnabled(TagerApplication.CHANNEL_MESSAGES)) {
+                openNotificationChannelSettings(TagerApplication.CHANNEL_MESSAGES);
+                return;
+            }
+            if (!channelEnabled(TagerApplication.CHANNEL_DOWNLOADS)) {
+                openNotificationChannelSettings(TagerApplication.CHANNEL_DOWNLOADS);
+                return;
+            }
+        }
+        openNotificationSettings();
     }
 
     private void refreshNotificationStatus() {
