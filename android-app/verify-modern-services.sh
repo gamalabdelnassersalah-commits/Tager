@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+BUILD="app/build.gradle"
+MANIFEST="app/src/main/AndroidManifest.xml"
+APP="app/src/main/java/com/tager/marketplace/TagerApplication.java"
+UPDATE="app/src/main/java/com/tager/marketplace/TagerUpdateCoordinator.java"
+NOTIFY="app/src/main/java/com/tager/marketplace/TagerNotificationCenter.java"
+WORKER="app/src/main/java/com/tager/marketplace/TagerMaintenanceWorker.java"
+SHORTCUTS="app/src/main/res/xml/shortcuts.xml"
+ACTIVITY="app/src/main/java/com/tager/marketplace/TagerActivity.java"
+
+# Core native dependencies and external navigation protection.
+grep -q "androidx.browser:browser:1.10.0" "$BUILD"
+grep -q "androidx.work:work-runtime:2.10.1" "$BUILD"
+grep -q "com.google.android.play:app-update:2.1.0" "$BUILD"
+grep -q 'CustomTabsIntent' "$ACTIVITY"
+grep -q 'openExternalWebLink' "$ACTIVITY"
+grep -q 'onPermissionRequest' "$ACTIVITY"
+grep -q 'request.deny()' "$ACTIVITY"
+
+# Background maintenance and Play update lifecycle.
+grep -q 'PeriodicWorkRequest' "$APP"
+grep -q 'ExistingPeriodicWorkPolicy.UPDATE' "$APP"
+grep -q 'TagerMaintenanceWorker.class' "$APP"
+grep -q 'class TagerMaintenanceWorker' "$WORKER"
+grep -q 'AppUpdateManagerFactory.create' "$UPDATE"
+grep -q 'AppUpdateType.FLEXIBLE' "$UPDATE"
+grep -q 'completeUpdate()' "$UPDATE"
+
+# Notification readiness without forcing permission prompts.
+grep -q 'android.permission.POST_NOTIFICATIONS' "$MANIFEST"
+grep -q 'CHANNEL_ORDERS' "$APP"
+grep -q 'CHANNEL_MESSAGES' "$APP"
+grep -q 'CHANNEL_DOWNLOADS' "$APP"
+grep -q 'class TagerNotificationCenter' "$NOTIFY"
+grep -q 'PendingIntent.FLAG_IMMUTABLE' "$NOTIFY"
+grep -q 'tager://' "$NOTIFY"
+
+# Native launcher shortcuts and deep-link routing.
+grep -q 'android.app.shortcuts' "$MANIFEST"
+grep -q '@xml/shortcuts' "$MANIFEST"
+for page in products track cart; do
+  grep -q "android:shortcutId=\"$page\"" "$SHORTCUTS"
+  grep -q "android:data=\"tager://$page\"" "$SHORTCUTS"
+done
+
+# Keep one native refresh implementation; prevent the old touch-listener path.
+grep -q 'TagerSwipeRefreshLayout' 'app/src/main/res/layout/activity_main.xml'
+if grep -q 'setOnTouchListener.*reload' "$ACTIVITY"; then
+  echo 'Legacy WebView touch refresh path detected' >&2
+  exit 1
+fi
+
+echo 'Tager modern Android service locks passed.'
