@@ -56,12 +56,19 @@ grep -q 'tager://' "$NOTIFY"
 grep -q 'ic_notification_tager' "$NOTIFY"
 test -f "$NOTIFICATION_ICON"
 
-# Native download center must stay app-private and use DownloadManager only.
+# Native download center must stay app-private, Tager-scoped and metadata-only.
 test -f "$DOWNLOADS"
 grep -q 'class TagerDownloadsActivity' "$DOWNLOADS"
 grep -q 'DownloadManager.Query' "$DOWNLOADS"
 grep -q 'getUriForDownloadedFile' "$DOWNLOADS"
 grep -q 'ACTION_VIEW_DOWNLOADS' "$DOWNLOADS"
+grep -q 'COLUMN_DESCRIPTION' "$DOWNLOADS"
+grep -q 'TAGER_DOWNLOAD_MARKER' "$DOWNLOADS"
+grep -q 'Tager | تاجر' "$DOWNLOADS"
+if grep -Eq 'COLUMN_URI|COLUMN_LOCAL_URI|CookieManager|getCookie\(' "$DOWNLOADS"; then
+  echo 'Download center must not read source URLs or cookies' >&2
+  exit 1
+fi
 grep -q 'android:name=".TagerDownloadsActivity"' "$MANIFEST"
 grep -A4 'android:name=".TagerDownloadsActivity"' "$MANIFEST" | grep -q 'android:exported="false"'
 test -f "$DOWNLOAD_ICON"
