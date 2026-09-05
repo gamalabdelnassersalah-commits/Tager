@@ -44,6 +44,19 @@
         </provider>
 
         <activity
+            android:name=".TagerSettingsActivity"
+            android:exported="true"
+            android:label="إعدادات تاجر"
+            android:theme="@style/Theme.Tager">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="tager" android:host="settings" />
+            </intent-filter>
+        </activity>
+
+        <activity
             android:name=".TagerDownloadsActivity"
             android:exported="true"
             android:label="تنزيلات تاجر"
