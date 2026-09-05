@@ -27,6 +27,7 @@ import androidx.core.content.ContextCompat;
 /** Native settings/status center for Tager Android. */
 public class TagerSettingsActivity extends Activity {
     private static final int NOTIFICATION_PERMISSION_REQUEST = 7301;
+    private static final int TEST_NOTIFICATION_ID = 730100;
 
     private TextView notificationStatus;
 
@@ -94,6 +95,10 @@ public class TagerSettingsActivity extends Activity {
         Button enable = actionButton("تفعيل الإشعارات");
         enable.setOnClickListener(v -> enableNotifications());
         addButton(card, enable);
+
+        Button test = actionButton("اختبار إشعار تاجر");
+        test.setOnClickListener(v -> testNotification());
+        addButton(card, test);
 
         Button settings = actionButton("إعدادات إشعارات Android");
         settings.setOnClickListener(v -> openNotificationSettings());
@@ -192,6 +197,21 @@ public class TagerSettingsActivity extends Activity {
             return;
         }
         Toast.makeText(this, "إشعارات تاجر مفعلة بالفعل", Toast.LENGTH_SHORT).show();
+    }
+
+    private void testNotification() {
+        if (!TagerNotificationCenter.canNotify(this)) {
+            Toast.makeText(this, "فعّل الإشعارات أولًا ثم أعد الاختبار", Toast.LENGTH_SHORT).show();
+            enableNotifications();
+            return;
+        }
+        TagerNotificationCenter.showMessageNotification(
+                this,
+                TEST_NOTIFICATION_ID,
+                "اختبار إشعارات تاجر",
+                "الإشعارات المحلية تعمل بشكل صحيح على هذا الجهاز.",
+                "home");
+        Toast.makeText(this, "تم إرسال إشعار اختبار", Toast.LENGTH_SHORT).show();
     }
 
     @Override
