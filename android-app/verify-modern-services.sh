@@ -9,6 +9,7 @@ NOTIFY="app/src/main/java/com/tager/marketplace/TagerNotificationCenter.java"
 WORKER="app/src/main/java/com/tager/marketplace/TagerMaintenanceWorker.java"
 CRASH="app/src/main/java/com/tager/marketplace/TagerCrashRecorder.java"
 DOWNLOADS="app/src/main/java/com/tager/marketplace/TagerDownloadsActivity.java"
+SETTINGS="app/src/main/java/com/tager/marketplace/TagerSettingsActivity.java"
 SHORTCUTS="app/src/main/res/xml/shortcuts.xml"
 ACTIVITY="app/src/main/java/com/tager/marketplace/TagerActivity.java"
 NOTIFICATION_ICON="app/src/main/res/drawable/ic_notification_tager.xml"
@@ -29,6 +30,13 @@ grep -q 'ExistingPeriodicWorkPolicy.UPDATE' "$APP"
 grep -q 'TagerMaintenanceWorker.class' "$APP"
 grep -q 'class TagerMaintenanceWorker' "$WORKER"
 grep -q 'TagerCrashRecorder.clearStale' "$WORKER"
+# Never manipulate Chromium/WebView-owned cache paths behind the renderer.
+if grep -q '"WebView"' "$WORKER"; then
+  echo 'Maintenance must not touch WebView-owned cache paths' >&2
+  exit 1
+fi
+grep -q 'new File(context.getCacheDir(), "camera")' "$WORKER"
+
 grep -q 'AppUpdateManagerFactory.create' "$UPDATE"
 grep -q 'AppUpdateType.FLEXIBLE' "$UPDATE"
 grep -q 'completeUpdate()' "$UPDATE"
@@ -38,6 +46,8 @@ grep -q 'KEY_UPDATE_LATER_AT' "$UPDATE"
 grep -q 'KEY_INSTALL_LATER_AT' "$UPDATE"
 grep -q 'UPDATE_PROMPT_COOLDOWN_MS' "$UPDATE"
 grep -q 'INSTALL_PROMPT_COOLDOWN_MS' "$UPDATE"
+grep -q 'onActivityResult' "$UPDATE"
+grep -q 'Activity.RESULT_CANCELED' "$UPDATE"
 grep -q 'تحديث الآن' "$UPDATE"
 grep -q 'إعادة تشغيل وتثبيت' "$UPDATE"
 
@@ -51,7 +61,7 @@ if grep -Eq 'getMessage\(|printStackTrace|StackTraceElement' "$CRASH"; then
   exit 1
 fi
 
-# Notification readiness without forcing permission prompts.
+# Notification readiness plus explicit user-driven native settings.
 grep -q 'android.permission.POST_NOTIFICATIONS' "$MANIFEST"
 grep -q 'CHANNEL_ORDERS' "$APP"
 grep -q 'CHANNEL_MESSAGES' "$APP"
@@ -61,6 +71,18 @@ grep -q 'PendingIntent.FLAG_IMMUTABLE' "$NOTIFY"
 grep -q 'tager://' "$NOTIFY"
 grep -q 'ic_notification_tager' "$NOTIFY"
 test -f "$NOTIFICATION_ICON"
+
+test -f "$SETTINGS"
+grep -q 'class TagerSettingsActivity' "$SETTINGS"
+grep -q 'requestPermissions' "$SETTINGS"
+grep -q 'POST_NOTIFICATIONS' "$SETTINGS"
+grep -q 'ACTION_APP_NOTIFICATION_SETTINGS' "$SETTINGS"
+grep -q 'ACTION_APPLICATION_DETAILS_SETTINGS' "$SETTINGS"
+grep -q 'getCurrentWebViewPackage' "$SETTINGS"
+grep -q 'TagerDownloadsActivity.class' "$SETTINGS"
+grep -q 'android:name=".TagerSettingsActivity"' "$MANIFEST"
+grep -A10 'android:name=".TagerSettingsActivity"' "$MANIFEST" | grep -q 'android:exported="true"'
+grep -A10 'android:name=".TagerSettingsActivity"' "$MANIFEST" | grep -q 'android:scheme="tager" android:host="settings"'
 
 # Native download center stays Tager-scoped and metadata-only.
 test -f "$DOWNLOADS"
