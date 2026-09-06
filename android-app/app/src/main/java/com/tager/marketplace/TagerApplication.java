@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.Application;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 
@@ -20,6 +21,7 @@ public class TagerApplication extends Application {
     public static final String CHANNEL_MESSAGES = "tager_messages";
     public static final String CHANNEL_DOWNLOADS = "tager_downloads";
     private static final String PERIODIC_MAINTENANCE = "tager_periodic_maintenance";
+    private static final String GOOGLE_PLAY_PACKAGE = "com.android.vending";
 
     private TagerUpdateCoordinator updateCoordinator;
 
@@ -29,7 +31,9 @@ public class TagerApplication extends Application {
         installCrashRecorder();
         createNotificationChannels();
         scheduleMaintenance();
-        updateCoordinator = new TagerUpdateCoordinator(this);
+        if (isInstalledFromGooglePlay()) {
+            updateCoordinator = new TagerUpdateCoordinator(this);
+        }
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             @Override public void onActivityCreated(@NonNull Activity activity, @Nullable Bundle state) { }
             @Override public void onActivityStarted(@NonNull Activity activity) { }
@@ -43,6 +47,23 @@ public class TagerApplication extends Application {
             @Override public void onActivitySaveInstanceState(@NonNull Activity activity, @NonNull Bundle outState) { }
             @Override public void onActivityDestroyed(@NonNull Activity activity) { }
         });
+    }
+
+    private boolean isInstalledFromGooglePlay() {
+        try {
+            String installer;
+            PackageManager packageManager = getPackageManager();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                installer = packageManager
+                        .getInstallSourceInfo(getPackageName())
+                        .getInstallingPackageName();
+            } else {
+                installer = packageManager.getInstallerPackageName(getPackageName());
+            }
+            return GOOGLE_PLAY_PACKAGE.equals(installer);
+        } catch (RuntimeException | PackageManager.NameNotFoundException ignored) {
+            return false;
+        }
     }
 
     private void installCrashRecorder() {
