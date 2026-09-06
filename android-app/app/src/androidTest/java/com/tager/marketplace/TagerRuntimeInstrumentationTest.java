@@ -56,15 +56,16 @@ public class TagerRuntimeInstrumentationTest {
     }
 
     @Test
-    public void verifiedAppLinkDispatcherDoesNotOwnWebView() {
-        String target = "https://tager-new.vercel.app/product/456#products";
-        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(target));
-        intent.setClassName("com.tager.marketplace", "com.tager.marketplace.TagerDeepLinkActivity");
+    public void trustedAppLinkRouterTargetsSingleTagerRuntime() {
+        Context context = ApplicationProvider.getApplicationContext();
+        Uri target = Uri.parse("https://tager-new.vercel.app/product/456#products");
+        Intent open = TagerLinkRouter.buildOpenIntent(context, target);
 
-        try (ActivityScenario<TagerDeepLinkActivity> scenario = ActivityScenario.launch(intent)) {
-            scenario.onActivity(activity ->
-                    assertEquals(0, countWebViews(activity.findViewById(android.R.id.content))));
-        }
+        assertNotNull(open.getComponent());
+        assertEquals(TagerActivity.class.getName(), open.getComponent().getClassName());
+        assertEquals(target.toString(), open.getStringExtra(TagerLinkRouter.EXTRA_TARGET_URL));
+        assertTrue((open.getFlags() & Intent.FLAG_ACTIVITY_CLEAR_TOP) != 0);
+        assertTrue((open.getFlags() & Intent.FLAG_ACTIVITY_SINGLE_TOP) != 0);
     }
 
     @Test
