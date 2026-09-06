@@ -54,6 +54,20 @@ jobs:
           :app:assembleDebug
           :app:assembleDebugAndroidTest
 
+      - name: Verify package identity separation
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          AAPT="$SDK_ROOT/build-tools/35.0.0/aapt"
+          RELEASE=android-app/app/build/outputs/apk/release/app-release-unsigned.apk
+          DEBUG=android-app/app/build/outputs/apk/debug/app-debug.apk
+          RELEASE_PACKAGE="$($AAPT dump badging "$RELEASE" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n1)"
+          DEBUG_PACKAGE="$($AAPT dump badging "$DEBUG" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n1)"
+          test "$RELEASE_PACKAGE" = "com.tager.marketplace" || { echo "Unexpected release package: $RELEASE_PACKAGE" >&2; exit 1; }
+          test "$DEBUG_PACKAGE" = "com.tager.marketplace.test" || { echo "Unexpected test package: $DEBUG_PACKAGE" >&2; exit 1; }
+          test "$RELEASE_PACKAGE" != "$DEBUG_PACKAGE" || { echo 'Release and test packages must differ' >&2; exit 1; }
+          echo "Release package: $RELEASE_PACKAGE"
+          echo "Test package: $DEBUG_PACKAGE"
+
       - name: Verify unsigned release APK alignment
         run: |
           SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
