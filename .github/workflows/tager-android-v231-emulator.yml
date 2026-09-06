@@ -43,6 +43,66 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
+      - name: Verify single external link dispatcher source architecture
+        run: |
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          ns = {'android': 'http://schemas.android.com/apk/res/android'}
+          android = '{http://schemas.android.com/apk/res/android}'
+          root = ET.parse('android-app/app/src/main/AndroidManifest.xml').getroot()
+          app = root.find('application')
+          activities = {
+              a.get(android + 'name'): a
+              for a in app.findall('activity')
+          }
+
+          def require(name):
+              if name not in activities:
+                  raise SystemExit(f'Missing activity {name}')
+              return activities[name]
+
+          dispatcher = require('.TagerDeepLinkActivity')
+          runtime = require('.TagerActivity')
+          settings = require('.TagerSettingsActivity')
+          downloads = require('.TagerDownloadsActivity')
+
+          if dispatcher.get(android + 'exported') != 'true':
+              raise SystemExit('DeepLink dispatcher must be exported')
+          if runtime.get(android + 'exported') != 'false':
+              raise SystemExit('TagerActivity must remain internal/non-exported')
+          if settings.get(android + 'exported') != 'false':
+              raise SystemExit('Settings activity must remain internal/non-exported')
+          if downloads.get(android + 'exported') != 'false':
+              raise SystemExit('Downloads activity must remain internal/non-exported')
+          if runtime.findall('intent-filter'):
+              raise SystemExit('TagerActivity must not own external intent filters')
+          if settings.findall('intent-filter') or downloads.findall('intent-filter'):
+              raise SystemExit('Native settings/downloads must route through dispatcher')
+
+          filters = dispatcher.findall('intent-filter')
+          schemes = []
+          for f in filters:
+              for data in f.findall('data'):
+                  scheme = data.get(android + 'scheme')
+                  if scheme:
+                      schemes.append(scheme)
+          if 'https' not in schemes or '${customScheme}' not in schemes:
+              raise SystemExit(f'Dispatcher schemes incomplete: {schemes}')
+
+          main_links = Path('android-app/app/src/main/res/values/shortcut_runtime_links.xml').read_text()
+          debug_links = Path('android-app/app/src/debug/res/values/shortcut_runtime_links.xml').read_text()
+          if 'tager://products' not in main_links or 'tager://settings' not in main_links:
+              raise SystemExit('Production shortcut links are incomplete')
+          if 'tager-test://products' not in debug_links or 'tager-test://settings' not in debug_links:
+              raise SystemExit('Test shortcut links are not isolated')
+          if 'tager-new.vercel.app' in debug_links or 'tager://' in debug_links.replace('tager-test://', ''):
+              raise SystemExit('Test shortcut links leak production routing')
+
+          print('Single dispatcher architecture and variant shortcut routing verified.')
+          PY
+
       - name: Build release, debug and instrumentation outputs
         working-directory: android-app
         run: >-
