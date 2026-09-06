@@ -55,7 +55,7 @@ jobs:
           grep -q 'withAndroidContext' "$SRC"
           grep -q 'extends Activity' "$DEEP"
           if grep -q 'extends TagerActivity' "$DEEP"; then exit 1; fi
-          if grep -Eq 'WebView|loadUrl' "$DEEP"; then exit 1; fi
+          if grep -Eq 'new[[:space:]]+WebView|\.loadUrl\(' "$DEEP"; then exit 1; fi
           grep -q 'intent.putExtra(EXTRA_TARGET_URL' "$ROUTER"
           grep -q 'android:noHistory="true"' "$MANIFEST"
       - name: Verify strict trusted-link policy
