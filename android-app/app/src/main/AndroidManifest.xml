@@ -59,29 +59,15 @@
 
         <activity
             android:name=".TagerSettingsActivity"
-            android:exported="true"
+            android:exported="false"
             android:label="إعدادات تاجر"
-            android:theme="@style/Theme.Tager">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="${customScheme}" android:host="settings" />
-            </intent-filter>
-        </activity>
+            android:theme="@style/Theme.Tager" />
 
         <activity
             android:name=".TagerDownloadsActivity"
-            android:exported="true"
+            android:exported="false"
             android:label="تنزيلات تاجر"
-            android:theme="@style/Theme.Tager">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="${customScheme}" android:host="downloads" />
-            </intent-filter>
-        </activity>
+            android:theme="@style/Theme.Tager" />
 
         <activity
             android:name=".TagerShareReceiverActivity"
@@ -108,16 +94,6 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="${appLinkHost}" />
             </intent-filter>
-        </activity>
-
-        <activity
-            android:name=".TagerActivity"
-            android:exported="true"
-            android:launchMode="singleTask"
-            android:resizeableActivity="true"
-            android:windowSoftInputMode="adjustResize"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden"
-            android:theme="@style/Theme.Tager.Starting">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -125,5 +101,14 @@
                 <data android:scheme="${customScheme}" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".TagerActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:resizeableActivity="true"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden"
+            android:theme="@style/Theme.Tager.Starting" />
     </application>
 </manifest>
