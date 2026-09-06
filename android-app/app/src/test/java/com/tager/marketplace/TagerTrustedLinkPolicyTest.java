@@ -25,6 +25,13 @@ public class TagerTrustedLinkPolicyTest {
     }
 
     @Test
+    public void rejectsEncodedAuthorityAndBackslashTricks() {
+        assertFalse(TagerTrustedLinkPolicy.isTrustedUrl("https://tager-new.vercel.app%2eevil.example/#home"));
+        assertFalse(TagerTrustedLinkPolicy.isTrustedUrl("https://tager-new.vercel.app%5cevil.example/#home"));
+        assertFalse(TagerTrustedLinkPolicy.isTrustedUrl("https://tager-new.vercel.app/%5c%5cevil"));
+    }
+
+    @Test
     public void extractsTrustedUrlFromArabicShareText() {
         String text = "شاهد المنتج على تاجر https://tager-new.vercel.app/?id=88#productDetails وشكراً";
         assertEquals(
@@ -34,7 +41,11 @@ public class TagerTrustedLinkPolicyTest {
 
     @Test
     public void blocksEncodedControlsAndOversizedInput() {
+        assertFalse(TagerTrustedLinkPolicy.isTrustedUrl("https://tager-new.vercel.app/%00evil"));
+        assertFalse(TagerTrustedLinkPolicy.isTrustedUrl("https://tager-new.vercel.app/%09evil"));
         assertFalse(TagerTrustedLinkPolicy.isTrustedUrl("https://tager-new.vercel.app/%0aevil"));
+        assertFalse(TagerTrustedLinkPolicy.isTrustedUrl("https://tager-new.vercel.app/%1fevil"));
+        assertFalse(TagerTrustedLinkPolicy.isTrustedUrl("https://tager-new.vercel.app/%7fevil"));
         StringBuilder huge = new StringBuilder("https://tager-new.vercel.app/");
         while (huge.length() <= 4200) huge.append('a');
         assertFalse(TagerTrustedLinkPolicy.isTrustedUrl(huge.toString()));
@@ -63,6 +74,14 @@ public class TagerTrustedLinkPolicyTest {
         assertEquals(
                 "https://tager-new.vercel.app/?id=5&tager_app=android&app_version=2.3.0#productDetails",
                 TagerTrustedLinkPolicy.withAndroidContext(source, "2.3.0"));
+    }
+
+    @Test
+    public void removesDoubleEncodedReservedKeyAliasesToo() {
+        String source = "https://tager-new.vercel.app/?tager%255Fapp=ios&app%255Fversion=1.0&id=7#cart";
+        assertEquals(
+                "https://tager-new.vercel.app/?id=7&tager_app=android&app_version=2.3.1#cart",
+                TagerTrustedLinkPolicy.withAndroidContext(source, "2.3.1"));
     }
 
     @Test
