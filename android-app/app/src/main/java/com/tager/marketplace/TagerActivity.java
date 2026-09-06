@@ -136,6 +136,8 @@ public class TagerActivity extends Activity {
             return;
         }
 
+        if (loadTrustedIntentTarget(getIntent())) return;
+
         String page = resolveRequestedPage(getIntent());
         updateSelectedNavigation(page);
         showLoading(true);
@@ -213,7 +215,46 @@ public class TagerActivity extends Activity {
         if (intent.hasExtra(EXTRA_SAFE_MODE)) {
             safeMode = intent.getBooleanExtra(EXTRA_SAFE_MODE, false);
         }
+        if (loadTrustedIntentTarget(intent)) return;
         navigateTo(resolveRequestedPage(intent));
+    }
+
+    private boolean loadTrustedIntentTarget(Intent intent) {
+        if (webView == null) return false;
+        String target = resolveTrustedIntentTarget(intent);
+        if (target == null) return false;
+        String contextual = TagerTrustedLinkPolicy.withAndroidContext(target, BuildConfig.VERSION_NAME);
+        if (contextual == null) return false;
+
+        String current = webView.getUrl();
+        if (firstPageLoaded && contextual.equals(current)) {
+            syncNavigationFromUrl(current);
+            return true;
+        }
+
+        String page = pageFromUrl(contextual);
+        updateSelectedNavigation(page);
+        offlinePanel.setVisibility(View.GONE);
+        boolean online = isOnline();
+        webView.getSettings().setCacheMode(
+                online ? WebSettings.LOAD_DEFAULT : WebSettings.LOAD_CACHE_ELSE_NETWORK);
+        if (!online) {
+            showStatus("لا يوجد اتصال مؤكد — سنستخدم المحتوى المحفوظ إن توفر");
+        }
+        showLoading(true);
+        webView.loadUrl(contextual);
+        return true;
+    }
+
+    private String resolveTrustedIntentTarget(Intent intent) {
+        if (intent == null) return null;
+        String extra = intent.getStringExtra(TagerLinkRouter.EXTRA_TARGET_URL);
+        if (TagerTrustedLinkPolicy.isTrustedUrl(extra)) return extra.trim();
+        Uri data = intent.getData();
+        if (data != null && TagerTrustedLinkPolicy.isTrustedUrl(data.toString())) {
+            return data.toString();
+        }
+        return null;
     }
 
     private String getPageUrl(String page) {
@@ -246,7 +287,7 @@ public class TagerActivity extends Activity {
                     if (host != null && !host.isEmpty() && !"open".equalsIgnoreCase(host)) return sanitizePage(host);
                     return sanitizePage(data.getLastPathSegment());
                 }
-                if (("http".equals(scheme) || "https".equals(scheme)) && isTagerHost(data.getHost())) {
+                if (TagerTrustedLinkPolicy.isTrustedUrl(data.toString())) {
                     return sanitizePage(data.getFragment());
                 }
             }
@@ -328,20 +369,11 @@ public class TagerActivity extends Activity {
     }
 
     private boolean isTagerHost(String host) {
-        if (host == null) return false;
-        String value = host.toLowerCase(Locale.ROOT);
-        return "tager-new.vercel.app".equals(value) || value.endsWith(".tager-new.vercel.app");
+        return host != null && TagerTrustedLinkPolicy.PRODUCTION_HOST.equalsIgnoreCase(host);
     }
 
     private boolean isTagerUrl(String url) {
-        try {
-            if (url == null) return false;
-            Uri uri = Uri.parse(url);
-            String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
-            return ("http".equals(scheme) || "https".equals(scheme)) && isTagerHost(uri.getHost());
-        } catch (Exception ignored) {
-            return false;
-        }
+        return TagerTrustedLinkPolicy.isTrustedUrl(url);
     }
 
     private void syncNavigationFromUrl(String url) {
@@ -680,8 +712,7 @@ public class TagerActivity extends Activity {
     private boolean handleNavigation(Uri uri) {
         if (uri == null) return true;
         String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
-        String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
-        if (("http".equals(scheme) || "https".equals(scheme)) && isTagerHost(host)) return false;
+        if (TagerTrustedLinkPolicy.isTrustedUrl(uri.toString())) return false;
 
         try {
             if ("tager".equals(scheme)) {

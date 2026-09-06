@@ -10,6 +10,7 @@ import android.net.Uri;
  */
 final class TagerLinkRouter {
     static final String PRODUCTION_HOST = TagerTrustedLinkPolicy.PRODUCTION_HOST;
+    static final String EXTRA_TARGET_URL = "tager_target_url";
 
     private TagerLinkRouter() { }
 
@@ -25,7 +26,8 @@ final class TagerLinkRouter {
     static Intent buildOpenIntent(Context context, Uri target) {
         Intent intent;
         if (isTrustedProductionUrl(target)) {
-            intent = new Intent(Intent.ACTION_VIEW, target, context, TagerDeepLinkActivity.class);
+            intent = new Intent(context, TagerActivity.class);
+            intent.putExtra(EXTRA_TARGET_URL, target.toString());
         } else if (target != null && "tager".equalsIgnoreCase(target.getScheme())) {
             intent = new Intent(Intent.ACTION_VIEW, target, context, TagerActivity.class);
         } else {

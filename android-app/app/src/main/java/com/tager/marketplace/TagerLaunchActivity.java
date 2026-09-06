@@ -39,13 +39,7 @@ public final class TagerLaunchActivity extends Activity {
                 BuildConfig.VERSION_NAME);
 
         Uri targetUri = Uri.parse(target);
-        Intent open;
-        if (TagerTrustedLinkPolicy.isTrustedUrl(target)) {
-            open = new Intent(Intent.ACTION_VIEW, targetUri, this, TagerDeepLinkActivity.class);
-        } else {
-            open = new Intent(Intent.ACTION_VIEW, targetUri, this, TagerActivity.class);
-        }
-        open.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        Intent open = TagerLinkRouter.buildOpenIntent(this, targetUri);
         startActivity(open);
         finish();
     }
