@@ -3,6 +3,7 @@ package com.tager.marketplace;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
@@ -69,6 +70,27 @@ public class TagerRuntimeInstrumentationTest {
         assertEquals(target.toString(), open.getStringExtra(TagerLinkRouter.EXTRA_TARGET_URL));
         assertTrue((open.getFlags() & Intent.FLAG_ACTIVITY_CLEAR_TOP) != 0);
         assertTrue((open.getFlags() & Intent.FLAG_ACTIVITY_SINGLE_TOP) != 0);
+    }
+
+    @Test
+    public void legacyAndCanonicalCustomLinksResolveToOneSafeForm() {
+        assertEquals(
+                "tager://open/products",
+                TagerLinkRouter.canonicalizeTagerUri(Uri.parse("tager://products")).toString());
+        assertEquals(
+                "tager://open/products",
+                TagerLinkRouter.canonicalizeTagerUri(Uri.parse("tager://open/products")).toString());
+        assertEquals(
+                "tager://open/home",
+                TagerLinkRouter.pageUri("../not-valid").toString());
+    }
+
+    @Test
+    public void malformedCustomLinksAreRejected() {
+        assertNull(TagerLinkRouter.canonicalizeTagerUri(Uri.parse("https://tager-new.vercel.app/#home")));
+        assertNull(TagerLinkRouter.canonicalizeTagerUri(Uri.parse("tager://user@products")));
+        assertNull(TagerLinkRouter.canonicalizeTagerUri(Uri.parse("tager://products:99")));
+        assertNull(TagerLinkRouter.canonicalizeTagerUri(Uri.parse("tager://products\\evil")));
     }
 
     @Test
