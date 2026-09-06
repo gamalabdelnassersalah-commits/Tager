@@ -24,6 +24,7 @@ final class TagerUpdateCoordinator {
     private static final String KEY_UPDATE_LATER_AT = "update_later_at";
     private static final String KEY_INSTALL_LATER_AT = "install_later_at";
     private static final long CHECK_INTERVAL_MS = 6L * 60L * 60L * 1000L;
+    private static final long RUNTIME_RECHECK_BACKOFF_MS = 15L * 60L * 1000L;
     private static final long UPDATE_PROMPT_COOLDOWN_MS = 24L * 60L * 60L * 1000L;
     private static final long INSTALL_PROMPT_COOLDOWN_MS = 6L * 60L * 60L * 1000L;
 
@@ -35,6 +36,7 @@ final class TagerUpdateCoordinator {
     private boolean updatePromptVisible;
     private boolean installPromptVisible;
     private boolean updateCheckInProgress;
+    private long lastRuntimeCheckAt;
 
     TagerUpdateCoordinator(TagerApplication application) {
         updateManager = AppUpdateManagerFactory.create(application);
@@ -57,6 +59,9 @@ final class TagerUpdateCoordinator {
         }
 
         long now = System.currentTimeMillis();
+        if (now - lastRuntimeCheckAt < RUNTIME_RECHECK_BACKOFF_MS) return;
+        lastRuntimeCheckAt = now;
+
         long lastCheck = preferences.getLong(KEY_LAST_CHECK_AT, 0L);
         if (now - lastCheck < CHECK_INTERVAL_MS) {
             checkDownloadedUpdate(activity);
@@ -73,13 +78,12 @@ final class TagerUpdateCoordinator {
     boolean onActivityResult(int requestCode, int resultCode) {
         if (requestCode != UPDATE_REQUEST_CODE) return false;
         updateFlowStarted = false;
-        long now = System.currentTimeMillis();
+        lastRuntimeCheckAt = System.currentTimeMillis();
+        long now = lastRuntimeCheckAt;
         SharedPreferences.Editor editor = preferences.edit();
         if (resultCode == Activity.RESULT_OK) {
             editor.remove(KEY_UPDATE_LATER_AT).putLong(KEY_LAST_CHECK_AT, now);
         } else {
-            // User cancellation or an interrupted Play flow gets a prompt
-            // cooldown, without being treated as a successful update check.
             editor.putLong(KEY_UPDATE_LATER_AT, now);
         }
         editor.apply();
@@ -112,18 +116,25 @@ final class TagerUpdateCoordinator {
     }
 
     private void checkDownloadedUpdate(Activity activity) {
+        if (updateCheckInProgress) return;
+        updateCheckInProgress = true;
         updateManager.getAppUpdateInfo()
                 .addOnSuccessListener(info -> {
+                    updateCheckInProgress = false;
                     if (!isUsable(activity)) return;
                     if (info.installStatus() == InstallStatus.DOWNLOADED) {
                         showInstallReadyPrompt(activity, false);
                     }
-                });
+                })
+                .addOnFailureListener(error -> updateCheckInProgress = false);
     }
 
     private void resumeUpdateIfNeeded(Activity activity) {
+        if (updateCheckInProgress) return;
+        updateCheckInProgress = true;
         updateManager.getAppUpdateInfo()
                 .addOnSuccessListener(info -> {
+                    updateCheckInProgress = false;
                     if (!isUsable(activity)) return;
                     if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS
                             && info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)) {
@@ -135,7 +146,10 @@ final class TagerUpdateCoordinator {
                         updateFlowStarted = false;
                     }
                 })
-                .addOnFailureListener(error -> updateFlowStarted = false);
+                .addOnFailureListener(error -> {
+                    updateCheckInProgress = false;
+                    updateFlowStarted = false;
+                });
     }
 
     private void showUpdateAvailablePrompt(Activity activity, AppUpdateInfo info) {
