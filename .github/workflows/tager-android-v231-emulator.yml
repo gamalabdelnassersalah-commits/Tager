@@ -50,9 +50,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
-          script: |
-            cd android-app
-            gradle --no-daemon :app:connectedDebugAndroidTest
+          script: gradle --no-daemon -p android-app :app:connectedDebugAndroidTest
 
       - name: Upload instrumentation reports
         if: always()
@@ -62,5 +60,5 @@ jobs:
           path: |
             android-app/app/build/reports/androidTests/
             android-app/app/build/outputs/androidTest-results/
-          if-no-files-found: ignore
+          if-no-files-found: warn
           retention-days: 14
