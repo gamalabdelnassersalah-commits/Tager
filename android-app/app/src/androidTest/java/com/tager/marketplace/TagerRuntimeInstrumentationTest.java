@@ -73,6 +73,24 @@ public class TagerRuntimeInstrumentationTest {
     }
 
     @Test
+    public void dispatcherRoutesNativeDestinationsAndRuntimePages() {
+        Context context = ApplicationProvider.getApplicationContext();
+        String scheme = BuildConfig.CUSTOM_SCHEME;
+
+        Intent settings = TagerLinkRouter.buildOpenIntent(context, Uri.parse(scheme + "://settings"));
+        Intent downloads = TagerLinkRouter.buildOpenIntent(context, Uri.parse(scheme + "://downloads"));
+        Intent products = TagerLinkRouter.buildOpenIntent(context, Uri.parse(scheme + "://products"));
+
+        assertNotNull(settings.getComponent());
+        assertEquals(TagerSettingsActivity.class.getName(), settings.getComponent().getClassName());
+        assertNotNull(downloads.getComponent());
+        assertEquals(TagerDownloadsActivity.class.getName(), downloads.getComponent().getClassName());
+        assertNotNull(products.getComponent());
+        assertEquals(TagerActivity.class.getName(), products.getComponent().getClassName());
+        assertEquals("tager://open/products", products.getDataString());
+    }
+
+    @Test
     public void notificationTargetsKeepTrustedHttpsAndSanitizeFallbacks() {
         String scheme = BuildConfig.CUSTOM_SCHEME;
         assertEquals(
