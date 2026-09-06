@@ -18,6 +18,12 @@ final class TagerTrustedLinkPolicy {
     private static final Pattern HTTPS_URL = Pattern.compile(
             "https://[^\\s<>\\\"']+",
             Pattern.CASE_INSENSITIVE);
+    private static final Pattern ENCODED_CONTROL = Pattern.compile(
+            "%(?:0[0-9a-f]|1[0-9a-f]|7f)",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern ENCODED_BACKSLASH = Pattern.compile(
+            "%5c",
+            Pattern.CASE_INSENSITIVE);
 
     private TagerTrustedLinkPolicy() { }
 
@@ -26,7 +32,7 @@ final class TagerTrustedLinkPolicy {
         String candidate = value.trim();
         if (candidate.isEmpty() || candidate.length() > MAX_URL_LENGTH) return false;
         if (containsControlCharacter(candidate) || containsEncodedControl(candidate)) return false;
-        if (candidate.indexOf('\\') >= 0) return false;
+        if (candidate.indexOf('\\') >= 0 || ENCODED_BACKSLASH.matcher(candidate).find()) return false;
 
         try {
             URI uri = new URI(candidate);
@@ -34,6 +40,13 @@ final class TagerTrustedLinkPolicy {
             if (uri.getScheme() == null || !"https".equalsIgnoreCase(uri.getScheme())) return false;
             if (uri.getHost() == null || !PRODUCTION_HOST.equalsIgnoreCase(uri.getHost())) return false;
             if (uri.getRawUserInfo() != null) return false;
+
+            String rawAuthority = uri.getRawAuthority();
+            if (rawAuthority == null || rawAuthority.indexOf('%') >= 0) return false;
+            boolean exactAuthority = PRODUCTION_HOST.equalsIgnoreCase(rawAuthority)
+                    || (PRODUCTION_HOST + ":443").equalsIgnoreCase(rawAuthority);
+            if (!exactAuthority) return false;
+
             int port = uri.getPort();
             if (port != -1 && port != 443) return false;
             return true;
@@ -89,11 +102,18 @@ final class TagerTrustedLinkPolicy {
     }
 
     private static String decodeQueryKey(String value) {
-        try {
-            return URLDecoder.decode(value, StandardCharsets.UTF_8.name()).toLowerCase(Locale.ROOT);
-        } catch (Exception ignored) {
-            return value == null ? "" : value.toLowerCase(Locale.ROOT);
+        if (value == null) return "";
+        String decoded = value;
+        for (int i = 0; i < 2; i++) {
+            try {
+                String next = URLDecoder.decode(decoded, StandardCharsets.UTF_8.name());
+                if (next.equals(decoded)) break;
+                decoded = next;
+            } catch (Exception ignored) {
+                break;
+            }
         }
+        return decoded.toLowerCase(Locale.ROOT);
     }
 
     private static String sanitizeVersion(String value) {
@@ -111,8 +131,7 @@ final class TagerTrustedLinkPolicy {
     }
 
     private static boolean containsEncodedControl(String value) {
-        String lower = value.toLowerCase(Locale.ROOT);
-        return lower.contains("%00") || lower.contains("%0a") || lower.contains("%0d");
+        return ENCODED_CONTROL.matcher(value).find();
     }
 
     private static String trimTrailingPunctuation(String value) {
