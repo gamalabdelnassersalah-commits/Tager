@@ -21,7 +21,6 @@ public class TagerIntentLinkSanitizerInstrumentationTest {
         Intent parsed = new Intent(Intent.ACTION_VIEW, Uri.parse("whatsapp://send?text=hello"));
         parsed.setPackage("com.whatsapp");
         parsed.setComponent(new ComponentName("com.evil", "com.evil.Hidden"));
-        parsed.setSelector(new Intent(Intent.ACTION_VIEW, Uri.parse("javascript:alert(1)")));
         parsed.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
         parsed.putExtra("unexpected", "secret");
 
@@ -35,6 +34,19 @@ public class TagerIntentLinkSanitizerInstrumentationTest {
         assertFalse(clean.hasExtra("unexpected"));
         assertEquals(0, clean.getFlags());
         assertTrue(clean.hasCategory(Intent.CATEGORY_BROWSABLE));
+    }
+
+    @Test
+    public void selectorIsNeverForwarded() {
+        Intent parsed = new Intent(Intent.ACTION_VIEW, Uri.parse("whatsapp://send?text=hello"));
+        parsed.setSelector(new Intent(Intent.ACTION_VIEW, Uri.parse("javascript:alert(1)")));
+
+        Intent clean = TagerIntentLinkSanitizer.sanitize(parsed);
+
+        assertEquals("whatsapp://send?text=hello", clean.getData().toString());
+        assertNull(clean.getSelector());
+        assertNull(clean.getComponent());
+        assertNull(clean.getPackage());
     }
 
     @Test
