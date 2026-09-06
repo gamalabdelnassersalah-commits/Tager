@@ -1,0 +1,92 @@
+name: Tager Android Universal Compatibility
+
+on:
+  push:
+    branches: [ android-v2.3.1-signing-readiness ]
+    paths:
+      - 'android-app/**'
+      - '.github/workflows/tager-android-v231-universal-compat.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  install-matrix:
+    name: Android API ${{ matrix.api }} install and launch
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [23, 28, 30, 35]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 36
+        run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Build universal test APK
+        working-directory: android-app
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Verify APK has no native ABI restriction
+        run: |
+          APK=android-app/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          if unzip -l "$APK" | grep -qE ' lib/(armeabi|armeabi-v7a|arm64-v8a|x86|x86_64)/'; then
+            echo 'Native libraries detected; ABI compatibility must be audited.' >&2
+            unzip -l "$APK" | grep -E ' lib/' >&2 || true
+            exit 1
+          fi
+          echo 'No native libraries: APK is architecture-neutral for ARM/x86/x86_64.'
+
+      - name: Install and launch on Android ${{ matrix.api }}
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: |
+            set -eux
+            APK=android-app/app/build/outputs/apk/debug/app-debug.apk
+            adb install -r "$APK"
+            adb shell pm path com.tager.marketplace.test
+            adb shell monkey -p com.tager.marketplace.test -c android.intent.category.LAUNCHER 1
+            sleep 3
+            adb shell dumpsys package com.tager.marketplace.test | grep -E 'versionName=2.3.1-test|versionCode=23'
+            adb shell pidof com.tager.marketplace.test || adb shell dumpsys activity activities | grep com.tager.marketplace.test
+
+      - name: Upload failed-install diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tager-universal-compat-api-${{ matrix.api }}-diagnostics
+          path: |
+            android-app/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
