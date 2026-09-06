@@ -1,4 +1,4 @@
-name: Sign Tager Android 2.3.1 Production APK
+name: Sign Tager Android 2.3.1 Production APK and AAB
 
 on:
   workflow_dispatch:
@@ -37,9 +37,9 @@ jobs:
           grep -q "versionCode 23" "$BUILD"
           grep -q "versionName '2.3.1'" "$BUILD"
 
-      - name: Lint, tests and build unsigned release APK
+      - name: Lint, tests and build unsigned release outputs
         working-directory: android-app
-        run: gradle --no-daemon :app:lintRelease :app:testReleaseUnitTest :app:assembleRelease
+        run: gradle --no-daemon :app:lintRelease :app:testReleaseUnitTest :app:assembleRelease :app:bundleRelease
 
       - name: Require signing secrets
         env:
@@ -116,6 +116,26 @@ jobs:
           "$SDK_ROOT/build-tools/35.0.0/zipalign" -c -P 16 -v 4 Tager-v2.3.1-production-signed.apk
           sha256sum Tager-v2.3.1-production-signed.apk > Tager-v2.3.1-production-signed.apk.sha256
 
+      - name: Sign production AAB
+        env:
+          STORE_PASSWORD: ${{ secrets.TAGER_ANDROID_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.TAGER_ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.TAGER_ANDROID_KEY_PASSWORD }}
+        run: |
+          cp android-app/app/build/outputs/bundle/release/app-release.aab Tager-v2.3.1-production-signed.aab
+          jarsigner \
+            -keystore "$RUNNER_TEMP/tager-release.keystore" \
+            -storepass "$STORE_PASSWORD" \
+            -keypass "$KEY_PASSWORD" \
+            -sigalg SHA256withRSA \
+            -digestalg SHA-256 \
+            Tager-v2.3.1-production-signed.aab "$KEY_ALIAS"
+
+      - name: Verify signed AAB
+        run: |
+          jarsigner -verify -strict -verbose -certs Tager-v2.3.1-production-signed.aab
+          sha256sum Tager-v2.3.1-production-signed.aab > Tager-v2.3.1-production-signed.aab.sha256
+
       - name: Remove keystore material
         if: always()
         run: |
@@ -128,4 +148,13 @@ jobs:
           path: |
             Tager-v2.3.1-production-signed.apk
             Tager-v2.3.1-production-signed.apk.sha256
+          retention-days: 14
+
+      - name: Upload production-signed AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tager-v2.3.1-production-signed-AAB
+          path: |
+            Tager-v2.3.1-production-signed.aab
+            Tager-v2.3.1-production-signed.aab.sha256
           retention-days: 14
