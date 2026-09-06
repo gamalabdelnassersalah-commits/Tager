@@ -13,6 +13,7 @@ final class TagerLinkRouter {
     static final String PRODUCTION_HOST = TagerTrustedLinkPolicy.PRODUCTION_HOST;
     static final String EXTRA_TARGET_URL = "tager_target_url";
     private static final int MAX_CUSTOM_URI_LENGTH = 2048;
+    private static final String INTERNAL_RUNTIME_SCHEME = "tager";
 
     private TagerLinkRouter() { }
 
@@ -32,10 +33,30 @@ final class TagerLinkRouter {
             intent.putExtra(EXTRA_TARGET_URL, target.toString());
         } else {
             Uri safeCustom = canonicalizeTagerUri(target);
-            if (safeCustom != null) {
-                intent = new Intent(Intent.ACTION_VIEW, safeCustom, context, TagerActivity.class);
-            } else {
+            if (safeCustom == null) {
                 intent = new Intent(context, TagerActivity.class);
+            } else {
+                String host = safeCustom.getHost() == null ? "" : safeCustom.getHost();
+                if ("settings".equalsIgnoreCase(host)) {
+                    intent = new Intent(context, TagerSettingsActivity.class);
+                } else if ("downloads".equalsIgnoreCase(host)) {
+                    intent = new Intent(context, TagerDownloadsActivity.class);
+                } else if ("share".equalsIgnoreCase(host)) {
+                    intent = new Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse(INTERNAL_RUNTIME_SCHEME + "://share"),
+                            context,
+                            TagerActivity.class);
+                } else {
+                    String page = "open".equalsIgnoreCase(host)
+                            ? safeCustom.getLastPathSegment()
+                            : host;
+                    intent = new Intent(
+                            Intent.ACTION_VIEW,
+                            internalPageUri(page),
+                            context,
+                            TagerActivity.class);
+                }
             }
         }
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -49,15 +70,17 @@ final class TagerLinkRouter {
     }
 
     static Uri canonicalizeTagerUri(Uri target) {
-        if (target == null || !"tager".equalsIgnoreCase(target.getScheme())) return null;
+        if (target == null || !BuildConfig.CUSTOM_SCHEME.equalsIgnoreCase(target.getScheme())) return null;
         String raw = target.toString();
         if (raw.length() > MAX_CUSTOM_URI_LENGTH || containsControl(raw) || raw.indexOf('\\') >= 0) return null;
         if (target.isOpaque() || target.getUserInfo() != null || target.getPort() != -1) return null;
 
         String host = target.getHost();
         if (host == null || host.isEmpty()) return null;
-        if ("share".equalsIgnoreCase(host)) {
-            return Uri.parse("tager://share");
+        if ("settings".equalsIgnoreCase(host)
+                || "downloads".equalsIgnoreCase(host)
+                || "share".equalsIgnoreCase(host)) {
+            return Uri.parse(BuildConfig.CUSTOM_SCHEME + "://" + host.toLowerCase());
         }
 
         String page;
@@ -70,7 +93,11 @@ final class TagerLinkRouter {
     }
 
     static Uri pageUri(String page) {
-        return Uri.parse("tager://open/" + sanitizePage(page));
+        return Uri.parse(BuildConfig.CUSTOM_SCHEME + "://open/" + sanitizePage(page));
+    }
+
+    private static Uri internalPageUri(String page) {
+        return Uri.parse(INTERNAL_RUNTIME_SCHEME + "://open/" + sanitizePage(page));
     }
 
     static String sanitizePage(String page) {
