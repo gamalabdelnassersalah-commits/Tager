@@ -16,6 +16,7 @@ android {
         versionCode 23
         versionName '2.3.1'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        buildConfigField 'String', 'CUSTOM_SCHEME', '"tager"'
         manifestPlaceholders = [
             appLabel: 'Tager | تاجر',
             appLinkHost: 'tager-new.vercel.app',
@@ -48,6 +49,7 @@ android {
         debug {
             applicationIdSuffix '.test'
             versionNameSuffix '-test'
+            buildConfigField 'String', 'CUSTOM_SCHEME', '"tager-test"'
             manifestPlaceholders = [
                 appLabel: 'Tager Test | تاجر تجريبي',
                 appLinkHost: 'tager-test.invalid',
