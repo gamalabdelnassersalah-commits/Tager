@@ -73,6 +73,23 @@ public class TagerRuntimeInstrumentationTest {
     }
 
     @Test
+    public void notificationTargetsKeepTrustedHttpsAndSanitizeFallbacks() {
+        assertEquals(
+                "https://tager-new.vercel.app/order/77#track",
+                TagerLinkRouter.safeNotificationTarget(
+                        "https://tager-new.vercel.app/order/77#track",
+                        "home").toString());
+        assertEquals(
+                "tager://open/cart",
+                TagerLinkRouter.safeNotificationTarget(
+                        "https://evil.example/phish",
+                        "cart").toString());
+        assertEquals(
+                "tager://open/home",
+                TagerLinkRouter.safeNotificationTarget(null, "../bad").toString());
+    }
+
+    @Test
     public void legacyAndCanonicalCustomLinksResolveToOneSafeForm() {
         assertEquals(
                 "tager://open/products",
