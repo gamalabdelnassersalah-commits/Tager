@@ -37,9 +37,10 @@ public class TagerRuntimeInstrumentationTest {
 
     @Test
     public void coldTrustedDeepLinkUsesSingleWebViewAndExactTarget() throws Exception {
+        Context context = ApplicationProvider.getApplicationContext();
         String target = "https://tager-new.vercel.app/product/123?src=android#products";
         Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(target));
-        intent.setClassName("com.tager.marketplace", "com.tager.marketplace.TagerActivity");
+        intent.setClass(context, TagerActivity.class);
 
         try (ActivityScenario<TagerActivity> scenario = ActivityScenario.launch(intent)) {
             WebView webView = waitForWebView(scenario);
@@ -62,6 +63,7 @@ public class TagerRuntimeInstrumentationTest {
         Intent open = TagerLinkRouter.buildOpenIntent(context, target);
 
         assertNotNull(open.getComponent());
+        assertEquals(context.getPackageName(), open.getComponent().getPackageName());
         assertEquals(TagerActivity.class.getName(), open.getComponent().getClassName());
         assertEquals(target.toString(), open.getStringExtra(TagerLinkRouter.EXTRA_TARGET_URL));
         assertTrue((open.getFlags() & Intent.FLAG_ACTIVITY_CLEAR_TOP) != 0);
@@ -85,8 +87,9 @@ public class TagerRuntimeInstrumentationTest {
 
     @Test
     public void untrustedHttpLinkIsNotAcceptedAsInternalTarget() throws Exception {
+        Context context = ApplicationProvider.getApplicationContext();
         Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("http://tager-new.vercel.app/#products"));
-        intent.setClassName("com.tager.marketplace", "com.tager.marketplace.TagerActivity");
+        intent.setClass(context, TagerActivity.class);
 
         try (ActivityScenario<TagerActivity> scenario = ActivityScenario.launch(intent)) {
             String current = waitForUrl(scenario, "https://tager-new.vercel.app/");
