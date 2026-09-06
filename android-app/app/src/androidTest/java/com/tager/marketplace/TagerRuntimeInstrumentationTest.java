@@ -8,6 +8,7 @@ import static org.junit.Assert.assertTrue;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Build;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.WebSettings;
@@ -73,15 +74,25 @@ public class TagerRuntimeInstrumentationTest {
     @Test
     public void webViewRuntimeSecurityIsHardened() throws Exception {
         try (ActivityScenario<TagerActivity> scenario = ActivityScenario.launch(TagerActivity.class)) {
-            WebView webView = waitForWebView(scenario);
-            WebSettings settings = webView.getSettings();
+            waitForWebView(scenario);
+            scenario.onActivity(activity -> {
+                WebView webView = activity.findViewById(R.id.webView);
+                assertNotNull(webView);
+                WebSettings settings = webView.getSettings();
 
-            assertFalse(settings.getAllowFileAccess());
-            assertFalse(settings.getAllowFileAccessFromFileURLs());
-            assertFalse(settings.getAllowUniversalAccessFromFileURLs());
-            assertEquals(WebSettings.MIXED_CONTENT_NEVER_ALLOW, settings.getMixedContentMode());
-            assertTrue(settings.getJavaScriptEnabled());
-            assertTrue(settings.getDomStorageEnabled());
+                assertFalse(settings.getAllowFileAccess());
+                assertFalse(settings.getAllowFileAccessFromFileURLs());
+                assertFalse(settings.getAllowUniversalAccessFromFileURLs());
+                assertEquals(WebSettings.MIXED_CONTENT_NEVER_ALLOW, settings.getMixedContentMode());
+                assertTrue(settings.getJavaScriptEnabled());
+                assertTrue(settings.getDomStorageEnabled());
+                assertFalse(settings.getGeolocationEnabled());
+                assertFalse(settings.getJavaScriptCanOpenWindowsAutomatically());
+                assertFalse(settings.supportMultipleWindows());
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    assertTrue(settings.getSafeBrowsingEnabled());
+                }
+            });
         }
     }
 
