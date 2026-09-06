@@ -2,8 +2,8 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@drawable/tager_launcher_background" />
     <item
-        android:width="76dp"
-        android:height="76dp"
+        android:width="82dp"
+        android:height="82dp"
         android:gravity="center"
-        android:drawable="@drawable/tager_launcher" />
+        android:drawable="@drawable/tager_launcher_mark" />
 </layer-list>
