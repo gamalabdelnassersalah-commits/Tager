@@ -1,0 +1,112 @@
+name: Build Tager Android 2.3.1 Stabilization
+
+on:
+  push:
+    branches: [ android-v2.3.1-stabilization ]
+    paths:
+      - 'android-app/**'
+      - '.github/workflows/tager-android-v231-stabilization.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK 36
+        run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Lint, unit tests and release build
+        working-directory: android-app
+        run: gradle --no-daemon :app:lintRelease :app:testReleaseUnitTest :app:assembleRelease :app:bundleRelease
+      - name: Verify unit tests
+        run: |
+          REPORT_DIR=android-app/app/build/test-results/testReleaseUnitTest
+          test -d "$REPORT_DIR"
+          grep -R -q 'TagerTrustedLinkPolicyTest' "$REPORT_DIR"
+          grep -R -q 'TagerStartupPolicyTest' "$REPORT_DIR"
+          if grep -R -Eq 'failures="[1-9]|errors="[1-9]' "$REPORT_DIR"; then exit 1; fi
+      - name: Verify 2.3.1 identity
+        run: |
+          BUILD=android-app/app/build.gradle
+          grep -q "versionCode 23" "$BUILD"
+          grep -q "versionName '2.3.1'" "$BUILD"
+          grep -q "applicationId 'com.tager.marketplace'" "$BUILD"
+          grep -q "targetSdk 36" "$BUILD"
+      - name: Verify single WebView runtime
+        run: |
+          SRC=android-app/app/src/main/java/com/tager/marketplace/TagerActivity.java
+          DEEP=android-app/app/src/main/java/com/tager/marketplace/TagerDeepLinkActivity.java
+          ROUTER=android-app/app/src/main/java/com/tager/marketplace/TagerLinkRouter.java
+          MANIFEST=android-app/app/src/main/AndroidManifest.xml
+          grep -q 'loadTrustedIntentTarget(getIntent())' "$SRC"
+          grep -q 'EXTRA_TARGET_URL' "$SRC"
+          grep -q 'withAndroidContext' "$SRC"
+          grep -q 'extends Activity' "$DEEP"
+          if grep -q 'extends TagerActivity' "$DEEP"; then exit 1; fi
+          if grep -Eq 'WebView|loadUrl' "$DEEP"; then exit 1; fi
+          grep -q 'intent.putExtra(EXTRA_TARGET_URL' "$ROUTER"
+          grep -q 'android:noHistory="true"' "$MANIFEST"
+      - name: Verify strict trusted-link policy
+        run: |
+          SRC=android-app/app/src/main/java/com/tager/marketplace/TagerActivity.java
+          POLICY=android-app/app/src/main/java/com/tager/marketplace/TagerTrustedLinkPolicy.java
+          NETWORK=android-app/app/src/main/res/xml/network_security_config.xml
+          grep -q 'TagerTrustedLinkPolicy.isTrustedUrl(uri.toString())' "$SRC"
+          grep -q 'return TagerTrustedLinkPolicy.isTrustedUrl(url);' "$SRC"
+          if grep -q 'endsWith(".tager-new.vercel.app")' "$SRC"; then exit 1; fi
+          grep -q '"https".equalsIgnoreCase(uri.getScheme())' "$POLICY"
+          grep -q 'PRODUCTION_HOST.equalsIgnoreCase(uri.getHost())' "$POLICY"
+          grep -q 'includeSubdomains="false"' "$NETWORK"
+      - name: Verify permission and production hardening
+        run: |
+          MANIFEST=android-app/app/src/main/AndroidManifest.xml
+          SRC=android-app/app/src/main/java/com/tager/marketplace/TagerActivity.java
+          test "$(grep -c '<uses-permission' "$MANIFEST")" -eq 3
+          grep -q 'android.permission.INTERNET' "$MANIFEST"
+          grep -q 'android.permission.ACCESS_NETWORK_STATE' "$MANIFEST"
+          grep -q 'android.permission.POST_NOTIFICATIONS' "$MANIFEST"
+          grep -q 'setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW)' "$SRC"
+          grep -q 'WebView.setWebContentsDebuggingEnabled(false)' "$SRC"
+          grep -q 'restoreLastGoodPage' "$SRC"
+          grep -q 'camera.setClipData' "$SRC"
+          grep -q 'android:allowBackup="false"' "$MANIFEST"
+          grep -q 'android:usesCleartextTraffic="false"' "$MANIFEST"
+          if grep -Eq 'READ_CONTACTS|READ_SMS|SEND_SMS|RECORD_AUDIO|ACCESS_FINE_LOCATION|ACCESS_COARSE_LOCATION|READ_PHONE_STATE|AD_ID' "$MANIFEST"; then exit 1; fi
+      - name: Verify unsigned APK alignment
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          "$SDK_ROOT/build-tools/35.0.0/zipalign" -c -P 16 -v 4 android-app/app/build/outputs/apk/release/app-release-unsigned.apk
+      - name: Prepare outputs
+        run: |
+          cp android-app/app/build/outputs/apk/release/app-release-unsigned.apk Tager-v2.3.1-stabilization-unsigned.apk
+          cp android-app/app/build/outputs/bundle/release/app-release.aab Tager-v2.3.1-stabilization-unsigned.aab
+          sha256sum Tager-v2.3.1-stabilization-unsigned.apk > Tager-v2.3.1-stabilization-unsigned.apk.sha256
+          sha256sum Tager-v2.3.1-stabilization-unsigned.aab > Tager-v2.3.1-stabilization-unsigned.aab.sha256
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tager-v2.3.1-stabilization-unsigned-APK
+          path: |
+            Tager-v2.3.1-stabilization-unsigned.apk
+            Tager-v2.3.1-stabilization-unsigned.apk.sha256
+          retention-days: 30
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tager-v2.3.1-stabilization-unsigned-AAB
+          path: |
+            Tager-v2.3.1-stabilization-unsigned.aab
+            Tager-v2.3.1-stabilization-unsigned.aab.sha256
+          retention-days: 30
