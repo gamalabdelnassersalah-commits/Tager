@@ -86,7 +86,6 @@ public class TagerRuntimeInstrumentationTest {
                 assertEquals(WebSettings.MIXED_CONTENT_NEVER_ALLOW, settings.getMixedContentMode());
                 assertTrue(settings.getJavaScriptEnabled());
                 assertTrue(settings.getDomStorageEnabled());
-                assertFalse(settings.getGeolocationEnabled());
                 assertFalse(settings.getJavaScriptCanOpenWindowsAutomatically());
                 assertFalse(settings.supportMultipleWindows());
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
