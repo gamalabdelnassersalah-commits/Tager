@@ -5,6 +5,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.view.View;
@@ -13,69 +14,113 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 
 import androidx.test.core.app.ActivityScenario;
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 @RunWith(AndroidJUnit4.class)
 public class TagerRuntimeInstrumentationTest {
+    private static final long URL_TIMEOUT_MS = 6000L;
+    private static final long POLL_MS = 100L;
+
+    @Before
+    public void clearPersistentState() {
+        Context context = ApplicationProvider.getApplicationContext();
+        context.getSharedPreferences("tager_app_state", Context.MODE_PRIVATE).edit().clear().commit();
+        context.getSharedPreferences("tager_update_state", Context.MODE_PRIVATE).edit().clear().commit();
+    }
 
     @Test
-    public void coldTrustedDeepLinkUsesSingleWebViewAndExactTarget() {
+    public void coldTrustedDeepLinkUsesSingleWebViewAndExactTarget() throws Exception {
         String target = "https://tager-new.vercel.app/product/123?src=android#products";
         Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(target));
         intent.setClassName("com.tager.marketplace", "com.tager.marketplace.TagerActivity");
 
         try (ActivityScenario<TagerActivity> scenario = ActivityScenario.launch(intent)) {
-            scenario.onActivity(activity -> {
-                WebView webView = activity.findViewById(R.id.webView);
-                assertNotNull(webView);
-                assertEquals(1, countWebViews(activity.findViewById(android.R.id.content)));
+            WebView webView = waitForWebView(scenario);
+            String current = waitForUrl(scenario, "https://tager-new.vercel.app/product/123");
 
-                String current = webView.getUrl();
-                assertNotNull(current);
-                assertTrue(current.startsWith("https://tager-new.vercel.app/product/123"));
-                assertTrue(current.contains("tager_app=android"));
-                assertTrue(current.contains("app_version=2.3.1"));
-                assertTrue(current.endsWith("#products"));
-            });
+            scenario.onActivity(activity ->
+                    assertEquals(1, countWebViews(activity.findViewById(android.R.id.content))));
+            assertNotNull(webView);
+            assertTrue(current.startsWith("https://tager-new.vercel.app/product/123"));
+            assertTrue(current.contains("tager_app=android"));
+            assertTrue(current.contains("app_version=2.3.1"));
+            assertTrue(current.endsWith("#products"));
         }
     }
 
     @Test
-    public void webViewRuntimeSecurityIsHardened() {
+    public void verifiedAppLinkDispatcherDoesNotOwnWebView() {
+        String target = "https://tager-new.vercel.app/product/456#products";
+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(target));
+        intent.setClassName("com.tager.marketplace", "com.tager.marketplace.TagerDeepLinkActivity");
+
+        try (ActivityScenario<TagerDeepLinkActivity> scenario = ActivityScenario.launch(intent)) {
+            scenario.onActivity(activity ->
+                    assertEquals(0, countWebViews(activity.findViewById(android.R.id.content))));
+        }
+    }
+
+    @Test
+    public void webViewRuntimeSecurityIsHardened() throws Exception {
         try (ActivityScenario<TagerActivity> scenario = ActivityScenario.launch(TagerActivity.class)) {
-            scenario.onActivity(activity -> {
-                WebView webView = activity.findViewById(R.id.webView);
-                assertNotNull(webView);
-                WebSettings settings = webView.getSettings();
+            WebView webView = waitForWebView(scenario);
+            WebSettings settings = webView.getSettings();
 
-                assertFalse(settings.getAllowFileAccess());
-                assertFalse(settings.getAllowFileAccessFromFileURLs());
-                assertFalse(settings.getAllowUniversalAccessFromFileURLs());
-                assertEquals(WebSettings.MIXED_CONTENT_NEVER_ALLOW, settings.getMixedContentMode());
-                assertTrue(settings.getJavaScriptEnabled());
-                assertTrue(settings.getDomStorageEnabled());
-            });
+            assertFalse(settings.getAllowFileAccess());
+            assertFalse(settings.getAllowFileAccessFromFileURLs());
+            assertFalse(settings.getAllowUniversalAccessFromFileURLs());
+            assertEquals(WebSettings.MIXED_CONTENT_NEVER_ALLOW, settings.getMixedContentMode());
+            assertTrue(settings.getJavaScriptEnabled());
+            assertTrue(settings.getDomStorageEnabled());
         }
     }
 
     @Test
-    public void untrustedHttpLinkIsNotAcceptedAsInternalTarget() {
+    public void untrustedHttpLinkIsNotAcceptedAsInternalTarget() throws Exception {
         Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("http://tager-new.vercel.app/#products"));
         intent.setClassName("com.tager.marketplace", "com.tager.marketplace.TagerActivity");
 
         try (ActivityScenario<TagerActivity> scenario = ActivityScenario.launch(intent)) {
+            String current = waitForUrl(scenario, "https://tager-new.vercel.app/");
+            assertTrue(current.startsWith("https://tager-new.vercel.app/"));
+            assertFalse(current.startsWith("http://"));
+        }
+    }
+
+    private static WebView waitForWebView(ActivityScenario<TagerActivity> scenario) throws Exception {
+        AtomicReference<WebView> ref = new AtomicReference<>();
+        long deadline = System.currentTimeMillis() + URL_TIMEOUT_MS;
+        while (System.currentTimeMillis() < deadline) {
+            scenario.onActivity(activity -> ref.set(activity.findViewById(R.id.webView)));
+            if (ref.get() != null) return ref.get();
+            Thread.sleep(POLL_MS);
+        }
+        assertNotNull("WebView was not created in time", ref.get());
+        return ref.get();
+    }
+
+    private static String waitForUrl(ActivityScenario<TagerActivity> scenario, String prefix) throws Exception {
+        AtomicReference<String> ref = new AtomicReference<>();
+        long deadline = System.currentTimeMillis() + URL_TIMEOUT_MS;
+        while (System.currentTimeMillis() < deadline) {
             scenario.onActivity(activity -> {
                 WebView webView = activity.findViewById(R.id.webView);
-                assertNotNull(webView);
-                String current = webView.getUrl();
-                assertNotNull(current);
-                assertTrue(current.startsWith("https://tager-new.vercel.app/"));
-                assertFalse(current.startsWith("http://"));
+                ref.set(webView == null ? null : webView.getUrl());
             });
+            String current = ref.get();
+            if (current != null && current.startsWith(prefix)) return current;
+            Thread.sleep(POLL_MS);
         }
+        assertNotNull("WebView URL was null after waiting", ref.get());
+        assertTrue("Unexpected WebView URL: " + ref.get(), ref.get().startsWith(prefix));
+        return ref.get();
     }
 
     private static int countWebViews(View view) {
