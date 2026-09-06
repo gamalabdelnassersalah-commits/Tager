@@ -6,9 +6,9 @@ import android.net.Uri;
 import android.os.Bundle;
 
 /**
- * Verified App Link dispatcher for Tager 2.3.1.
- * This activity owns no WebView. It validates external HTTPS links and forwards
- * the full target to the single TagerActivity runtime.
+ * Single external link dispatcher for Tager 2.3.1.
+ * This activity owns no WebView. It validates HTTPS App Links and variant-safe
+ * custom links, then forwards them to one explicit native/runtime destination.
  */
 public final class TagerDeepLinkActivity extends Activity {
     @Override
@@ -17,18 +17,16 @@ public final class TagerDeepLinkActivity extends Activity {
         forward(getIntent());
     }
 
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        forward(intent);
+    }
+
     private void forward(Intent source) {
         Uri data = source == null ? null : source.getData();
-        Intent open;
-        if (TagerLinkRouter.isTrustedProductionUrl(data)) {
-            open = new Intent(this, TagerActivity.class);
-            open.putExtra(TagerLinkRouter.EXTRA_TARGET_URL, data.toString());
-        } else if (data != null && "tager".equalsIgnoreCase(data.getScheme())) {
-            open = new Intent(Intent.ACTION_VIEW, data, this, TagerActivity.class);
-        } else {
-            open = new Intent(this, TagerActivity.class);
-        }
-        open.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        Intent open = TagerLinkRouter.buildOpenIntent(this, data);
         startActivity(open);
         finish();
     }
