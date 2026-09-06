@@ -74,40 +74,44 @@ public class TagerRuntimeInstrumentationTest {
 
     @Test
     public void notificationTargetsKeepTrustedHttpsAndSanitizeFallbacks() {
+        String scheme = BuildConfig.CUSTOM_SCHEME;
         assertEquals(
                 "https://tager-new.vercel.app/order/77#track",
                 TagerLinkRouter.safeNotificationTarget(
                         "https://tager-new.vercel.app/order/77#track",
                         "home").toString());
         assertEquals(
-                "tager://open/cart",
+                scheme + "://open/cart",
                 TagerLinkRouter.safeNotificationTarget(
                         "https://evil.example/phish",
                         "cart").toString());
         assertEquals(
-                "tager://open/home",
+                scheme + "://open/home",
                 TagerLinkRouter.safeNotificationTarget(null, "../bad").toString());
     }
 
     @Test
     public void legacyAndCanonicalCustomLinksResolveToOneSafeForm() {
+        String scheme = BuildConfig.CUSTOM_SCHEME;
         assertEquals(
-                "tager://open/products",
-                TagerLinkRouter.canonicalizeTagerUri(Uri.parse("tager://products")).toString());
+                scheme + "://open/products",
+                TagerLinkRouter.canonicalizeTagerUri(Uri.parse(scheme + "://products")).toString());
         assertEquals(
-                "tager://open/products",
-                TagerLinkRouter.canonicalizeTagerUri(Uri.parse("tager://open/products")).toString());
+                scheme + "://open/products",
+                TagerLinkRouter.canonicalizeTagerUri(Uri.parse(scheme + "://open/products")).toString());
         assertEquals(
-                "tager://open/home",
+                scheme + "://open/home",
                 TagerLinkRouter.pageUri("../not-valid").toString());
     }
 
     @Test
     public void malformedCustomLinksAreRejected() {
+        String scheme = BuildConfig.CUSTOM_SCHEME;
         assertNull(TagerLinkRouter.canonicalizeTagerUri(Uri.parse("https://tager-new.vercel.app/#home")));
-        assertNull(TagerLinkRouter.canonicalizeTagerUri(Uri.parse("tager://user@products")));
-        assertNull(TagerLinkRouter.canonicalizeTagerUri(Uri.parse("tager://products:99")));
-        assertNull(TagerLinkRouter.canonicalizeTagerUri(Uri.parse("tager://products\\evil")));
+        assertNull(TagerLinkRouter.canonicalizeTagerUri(Uri.parse(scheme + "://user@products")));
+        assertNull(TagerLinkRouter.canonicalizeTagerUri(Uri.parse(scheme + "://products:99")));
+        assertNull(TagerLinkRouter.canonicalizeTagerUri(Uri.parse(scheme + "://products\\evil")));
+        assertNull(TagerLinkRouter.canonicalizeTagerUri(Uri.parse("wrong-scheme://products")));
     }
 
     @Test
