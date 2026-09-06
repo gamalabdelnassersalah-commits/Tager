@@ -68,6 +68,23 @@ jobs:
           echo "Release package: $RELEASE_PACKAGE"
           echo "Test package: $DEBUG_PACKAGE"
 
+      - name: Verify deep link isolation
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          AAPT="$SDK_ROOT/build-tools/35.0.0/aapt"
+          RELEASE=android-app/app/build/outputs/apk/release/app-release-unsigned.apk
+          DEBUG=android-app/app/build/outputs/apk/debug/app-debug.apk
+          "$AAPT" dump xmltree "$RELEASE" AndroidManifest.xml > "$RUNNER_TEMP/release-manifest.txt"
+          "$AAPT" dump xmltree "$DEBUG" AndroidManifest.xml > "$RUNNER_TEMP/debug-manifest.txt"
+          grep -q 'tager-new.vercel.app' "$RUNNER_TEMP/release-manifest.txt" || { echo 'Release App Link host missing' >&2; exit 1; }
+          grep -q 'tager-test.invalid' "$RUNNER_TEMP/debug-manifest.txt" || { echo 'Test App Link host missing' >&2; exit 1; }
+          if grep -q 'tager-new.vercel.app' "$RUNNER_TEMP/debug-manifest.txt"; then
+            echo 'Test APK must not claim the production App Link host' >&2
+            exit 1
+          fi
+          grep -q 'tager-test' "$RUNNER_TEMP/debug-manifest.txt" || { echo 'Test custom scheme missing' >&2; exit 1; }
+          echo 'Release and test deep-link registrations are isolated.'
+
       - name: Verify unsigned release APK alignment
         run: |
           SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
