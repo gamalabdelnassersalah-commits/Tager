@@ -28,6 +28,10 @@ public class TagerExternalLinkPolicyTest {
         assertFalse(TagerExternalLinkPolicy.isSafeBrowserFallback("javascript:alert(1)"));
         assertFalse(TagerExternalLinkPolicy.isSafeBrowserFallback("file:///sdcard/a"));
         assertFalse(TagerExternalLinkPolicy.isSafeBrowserFallback("https://example.com\\@evil.example"));
+        assertFalse(TagerExternalLinkPolicy.isSafeBrowserFallback("https://user@example.com/path"));
+        assertFalse(TagerExternalLinkPolicy.isSafeBrowserFallback("https:///missing-host"));
+        assertFalse(TagerExternalLinkPolicy.isSafeBrowserFallback("https://example.com/%0aevil"));
+        assertFalse(TagerExternalLinkPolicy.isSafeBrowserFallback("https://example.com/%5cevil"));
     }
 
     @Test
