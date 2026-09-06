@@ -9,6 +9,10 @@ import java.util.regex.Pattern;
 final class TagerExternalLinkPolicy {
     private static final int MAX_EXTERNAL_URL_LENGTH = 4096;
     private static final Pattern PACKAGE_NAME = Pattern.compile("[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)+");
+    private static final Pattern ENCODED_CONTROL = Pattern.compile(
+            "%(?:0[0-9a-f]|1[0-9a-f]|7f)",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern ENCODED_BACKSLASH = Pattern.compile("%5c", Pattern.CASE_INSENSITIVE);
 
     private TagerExternalLinkPolicy() { }
 
@@ -33,13 +37,21 @@ final class TagerExternalLinkPolicy {
         if (value == null) return false;
         String candidate = value.trim();
         if (candidate.isEmpty() || candidate.length() > MAX_EXTERNAL_URL_LENGTH) return false;
-        if (containsControlCharacter(candidate) || candidate.indexOf('\\') >= 0) return false;
+        if (containsControlCharacter(candidate)
+                || candidate.indexOf('\\') >= 0
+                || ENCODED_CONTROL.matcher(candidate).find()
+                || ENCODED_BACKSLASH.matcher(candidate).find()) {
+            return false;
+        }
         try {
             URI uri = new URI(candidate);
             String scheme = uri.getScheme();
-            if (scheme == null) return false;
+            if (scheme == null || uri.isOpaque()) return false;
             String lower = scheme.toLowerCase(Locale.ROOT);
-            return ("http".equals(lower) || "https".equals(lower)) && !uri.isOpaque();
+            if (!"http".equals(lower) && !"https".equals(lower)) return false;
+            if (uri.getHost() == null || uri.getHost().trim().isEmpty()) return false;
+            if (uri.getRawUserInfo() != null) return false;
+            return true;
         } catch (URISyntaxException | IllegalArgumentException ignored) {
             return false;
         }
