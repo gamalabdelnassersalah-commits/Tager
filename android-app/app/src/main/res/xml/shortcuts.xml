@@ -8,7 +8,7 @@
         android:shortcutLongLabel="@string/shortcut_products_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:data="tager://products" />
+            android:data="@string/shortcut_products_uri" />
     </shortcut>
 
     <shortcut
@@ -19,7 +19,7 @@
         android:shortcutLongLabel="@string/shortcut_track_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:data="tager://track" />
+            android:data="@string/shortcut_track_uri" />
     </shortcut>
 
     <shortcut
@@ -30,7 +30,7 @@
         android:shortcutLongLabel="@string/shortcut_cart_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:data="tager://cart" />
+            android:data="@string/shortcut_cart_uri" />
     </shortcut>
 
     <shortcut
@@ -41,8 +41,7 @@
         android:shortcutLongLabel="@string/shortcut_downloads_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="com.tager.marketplace"
-            android:targetClass="com.tager.marketplace.TagerDownloadsActivity" />
+            android:data="@string/shortcut_downloads_uri" />
     </shortcut>
 
     <shortcut
@@ -53,7 +52,6 @@
         android:shortcutLongLabel="@string/shortcut_settings_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="com.tager.marketplace"
-            android:targetClass="com.tager.marketplace.TagerSettingsActivity" />
+            android:data="@string/shortcut_settings_uri" />
     </shortcut>
 </shortcuts>
