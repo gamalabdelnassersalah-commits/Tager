@@ -73,14 +73,32 @@ jobs:
           disable-animations: true
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
-            set -eux
-            APK=android-app/app/build/outputs/apk/debug/app-debug.apk
-            adb install -r "$APK"
+            adb install -r android-app/app/build/outputs/apk/debug/app-debug.apk
             adb shell pm path com.tager.marketplace.test
             adb shell monkey -p com.tager.marketplace.test -c android.intent.category.LAUNCHER 1
             sleep 3
             adb shell dumpsys package com.tager.marketplace.test | grep -E 'versionName=2.3.1-test|versionCode=23'
             adb shell pidof com.tager.marketplace.test || adb shell dumpsys activity activities | grep com.tager.marketplace.test
+
+      - name: Prepare universal signed test APK
+        if: matrix.api == 28
+        run: |
+          SRC=android-app/app/build/outputs/apk/debug/app-debug.apk
+          OUT=Tager-v2.3.1-universal-test-signed.apk
+          test -s "$SRC"
+          cp "$SRC" "$OUT"
+          "$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$OUT"
+          sha256sum "$OUT" > "$OUT.sha256"
+
+      - name: Upload universal signed test APK
+        if: matrix.api == 28
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tager-v2.3.1-universal-test-signed-APK
+          path: |
+            Tager-v2.3.1-universal-test-signed.apk
+            Tager-v2.3.1-universal-test-signed.apk.sha256
+          retention-days: 14
 
       - name: Upload failed-install diagnostics
         if: failure()
