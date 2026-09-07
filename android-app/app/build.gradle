@@ -64,6 +64,21 @@ android {
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
+        universal {
+            initWith release
+            applicationIdSuffix '.universal'
+            versionNameSuffix '-universal'
+            buildConfigField 'String', 'CUSTOM_SCHEME', '"tager-universal"'
+            manifestPlaceholders = [
+                appLabel: 'Tager Universal | تاجر',
+                appLinkHost: 'tager-universal.invalid',
+                customScheme: 'tager-universal'
+            ]
+            debuggable false
+            minifyEnabled true
+            shrinkResources true
+            matchingFallbacks = ['release']
+        }
     }
 }
 
