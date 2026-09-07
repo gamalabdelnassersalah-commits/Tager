@@ -48,20 +48,51 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      - name: Build universal test APK
+      - name: Build isolated universal APK
         working-directory: android-app
-        run: gradle --no-daemon :app:assembleDebug
+        run: gradle --no-daemon :app:assembleUniversal
 
-      - name: Verify APK has no native ABI restriction
+      - name: Decode stable universal test key
         run: |
-          APK=android-app/app/build/outputs/apk/debug/app-debug.apk
-          test -s "$APK"
+          base64 -d android-app/signing/tager-universal-test.jks.b64 > "$RUNNER_TEMP/tager-universal-test.jks"
+          test -s "$RUNNER_TEMP/tager-universal-test.jks"
+
+      - name: Sign universal APK with stable test certificate
+        env:
+          KS_PASS: TagerUniversalTest2026!
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          SRC=android-app/app/build/outputs/apk/universal/app-universal-unsigned.apk
+          ALIGNED="$RUNNER_TEMP/Tager-v2.3.1-universal-aligned.apk"
+          OUT=Tager-v2.3.1-universal-stable-signed.apk
+          test -s "$SRC"
+          "$SDK_ROOT/build-tools/35.0.0/zipalign" -f -P 16 4 "$SRC" "$ALIGNED"
+          "$SDK_ROOT/build-tools/35.0.0/apksigner" sign \
+            --ks "$RUNNER_TEMP/tager-universal-test.jks" \
+            --ks-key-alias tager-universal-test \
+            --ks-pass env:KS_PASS \
+            --key-pass env:KS_PASS \
+            --v1-signing-enabled true \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
+            --out "$OUT" \
+            "$ALIGNED"
+          "$SDK_ROOT/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$OUT"
+          "$SDK_ROOT/build-tools/35.0.0/zipalign" -c -P 16 -v 4 "$OUT"
+          sha256sum "$OUT" > "$OUT.sha256"
+
+      - name: Verify universal package and ABI neutrality
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          APK=Tager-v2.3.1-universal-stable-signed.apk
+          PACKAGE="$($SDK_ROOT/build-tools/35.0.0/aapt dump badging "$APK" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n1)"
+          test "$PACKAGE" = "com.tager.marketplace.universal" || { echo "Unexpected package: $PACKAGE" >&2; exit 1; }
           if unzip -l "$APK" | grep -qE ' lib/(armeabi|armeabi-v7a|arm64-v8a|x86|x86_64)/'; then
             echo 'Native libraries detected; ABI compatibility must be audited.' >&2
-            unzip -l "$APK" | grep -E ' lib/' >&2 || true
             exit 1
           fi
-          echo 'No native libraries: APK is architecture-neutral for ARM/x86/x86_64.'
+          echo "Universal package: $PACKAGE"
+          echo 'No native libraries: architecture-neutral for ARM/x86/x86_64.'
 
       - name: Install and launch on Android ${{ matrix.api }}
         uses: reactivecircus/android-emulator-runner@v2
@@ -73,38 +104,29 @@ jobs:
           disable-animations: true
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
-            adb install -r android-app/app/build/outputs/apk/debug/app-debug.apk
-            adb shell pm path com.tager.marketplace.test
-            adb shell monkey -p com.tager.marketplace.test -c android.intent.category.LAUNCHER 1
+            adb install -r Tager-v2.3.1-universal-stable-signed.apk
+            adb shell pm path com.tager.marketplace.universal
+            adb shell monkey -p com.tager.marketplace.universal -c android.intent.category.LAUNCHER 1
             sleep 3
-            adb shell dumpsys package com.tager.marketplace.test | grep -E 'versionName=2.3.1-test|versionCode=23'
-            adb shell pidof com.tager.marketplace.test || adb shell dumpsys activity activities | grep com.tager.marketplace.test
+            adb shell dumpsys package com.tager.marketplace.universal | grep -E 'versionName=2.3.1-universal|versionCode=23'
+            adb shell pidof com.tager.marketplace.universal || adb shell dumpsys activity activities | grep com.tager.marketplace.universal
 
-      - name: Prepare universal signed test APK
-        if: matrix.api == 28
-        run: |
-          SRC=android-app/app/build/outputs/apk/debug/app-debug.apk
-          OUT=Tager-v2.3.1-universal-test-signed.apk
-          test -s "$SRC"
-          cp "$SRC" "$OUT"
-          "$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$OUT"
-          sha256sum "$OUT" > "$OUT.sha256"
-
-      - name: Upload universal signed test APK
+      - name: Upload universal stable-signed APK
         if: matrix.api == 28
         uses: actions/upload-artifact@v4
         with:
-          name: Tager-v2.3.1-universal-test-signed-APK
+          name: Tager-v2.3.1-universal-stable-signed-APK
           path: |
-            Tager-v2.3.1-universal-test-signed.apk
-            Tager-v2.3.1-universal-test-signed.apk.sha256
+            Tager-v2.3.1-universal-stable-signed.apk
+            Tager-v2.3.1-universal-stable-signed.apk.sha256
           retention-days: 14
 
       - name: Upload failed-install diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: Tager-universal-compat-api-${{ matrix.api }}-diagnostics
+          name: Tager-universal-stable-api-${{ matrix.api }}-diagnostics
           path: |
-            android-app/app/build/outputs/apk/debug/app-debug.apk
+            Tager-v2.3.1-universal-stable-signed.apk
+          if-no-files-found: ignore
           retention-days: 7
