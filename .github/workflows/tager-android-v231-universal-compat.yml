@@ -52,6 +52,28 @@ jobs:
         working-directory: android-app
         run: gradle --no-daemon :app:assembleUniversal
 
+      - name: Verify launcher icon resources
+        run: |
+          set -euo pipefail
+          test -s android-app/app/src/main/res/drawable/tager_launcher_mark.xml
+          test -s android-app/app/src/main/res/drawable/tager_launcher_foreground.xml
+          test -s android-app/app/src/main/res/drawable/tager_launcher_background.xml
+          test -s android-app/app/src/main/res/drawable/tager_launcher_legacy.xml
+          test -s android-app/app/src/main/res/drawable/tager_launcher_round_legacy.xml
+          test -s android-app/app/src/main/res/drawable/tager_launcher_monochrome.xml
+          grep -q '@drawable/tager_launcher_mark' android-app/app/src/main/res/drawable/tager_launcher_foreground.xml
+          grep -q '@drawable/tager_launcher_legacy' android-app/app/src/main/res/mipmap-anydpi/ic_launcher.xml
+          grep -q '@drawable/tager_launcher_round_legacy' android-app/app/src/main/res/mipmap-anydpi/ic_launcher_round.xml
+          grep -q '@drawable/tager_launcher_foreground' android-app/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          grep -q '@drawable/tager_launcher_background' android-app/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          grep -q '<monochrome android:drawable="@drawable/tager_launcher_monochrome"' android-app/app/src/main/res/mipmap-anydpi-v33/ic_launcher.xml
+          grep -q '<monochrome android:drawable="@drawable/tager_launcher_monochrome"' android-app/app/src/main/res/mipmap-anydpi-v33/ic_launcher_round.xml
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          APK=android-app/app/build/outputs/apk/universal/app-universal-unsigned.apk
+          "$SDK_ROOT/build-tools/35.0.0/aapt" dump badging "$APK" | grep -q "application-label:'Tager Universal | تاجر'"
+          "$SDK_ROOT/build-tools/35.0.0/aapt" dump badging "$APK" | grep -q 'application-icon-'
+          echo 'Launcher icon resources verified for legacy, adaptive, round and themed Android launchers.'
+
       - name: Decode stable universal test key
         run: |
           base64 -d android-app/signing/tager-universal-test.jks.b64 > "$RUNNER_TEMP/tager-universal-test.jks"
