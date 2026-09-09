@@ -27,6 +27,7 @@ public class TagerApplication extends Application {
     private static final long MAINTENANCE_STARTUP_DELAY_MS = 5000L;
 
     private TagerUpdateCoordinator updateCoordinator;
+    private Boolean installedFromGooglePlay;
     private final Handler startupHandler = new Handler(Looper.getMainLooper());
 
     @Override
@@ -35,13 +36,12 @@ public class TagerApplication extends Application {
         installCrashRecorder();
         createNotificationChannels();
         scheduleMaintenanceDeferred();
-        if (isInstalledFromGooglePlay()) {
-            updateCoordinator = new TagerUpdateCoordinator(this);
-        }
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             @Override public void onActivityCreated(@NonNull Activity activity, @Nullable Bundle state) { }
             @Override public void onActivityStarted(@NonNull Activity activity) { }
             @Override public void onActivityResumed(@NonNull Activity activity) {
+                if (!(activity instanceof TagerActivity)) return;
+                ensureUpdateCoordinator();
                 if (updateCoordinator != null) updateCoordinator.onActivityResumed(activity);
             }
             @Override public void onActivityPaused(@NonNull Activity activity) {
@@ -51,6 +51,20 @@ public class TagerApplication extends Application {
             @Override public void onActivitySaveInstanceState(@NonNull Activity activity, @NonNull Bundle outState) { }
             @Override public void onActivityDestroyed(@NonNull Activity activity) { }
         });
+    }
+
+    private void ensureUpdateCoordinator() {
+        if (updateCoordinator != null) return;
+        if (installedFromGooglePlay == null) {
+            installedFromGooglePlay = isInstalledFromGooglePlay();
+        }
+        if (Boolean.TRUE.equals(installedFromGooglePlay)) {
+            try {
+                updateCoordinator = new TagerUpdateCoordinator(this);
+            } catch (RuntimeException ignored) {
+                updateCoordinator = null;
+            }
+        }
     }
 
     private boolean isInstalledFromGooglePlay() {
