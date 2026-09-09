@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcut_products_uri" translatable="false">tager-universal://products</string>
+    <string name="shortcut_track_uri" translatable="false">tager-universal://track</string>
+    <string name="shortcut_cart_uri" translatable="false">tager-universal://cart</string>
+    <string name="shortcut_downloads_uri" translatable="false">tager-universal://downloads</string>
+    <string name="shortcut_settings_uri" translatable="false">tager-universal://settings</string>
+</resources>
