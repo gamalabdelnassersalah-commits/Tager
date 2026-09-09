@@ -139,6 +139,7 @@ public class TagerRuntimeInstrumentationTest {
             scenario.onActivity(activity -> {
                 WebView webView = activity.findViewById(R.id.webView);
                 assertNotNull(webView);
+                assertTrue(webView instanceof TagerSecureWebView);
                 WebSettings settings = webView.getSettings();
 
                 assertFalse(settings.getAllowFileAccess());
