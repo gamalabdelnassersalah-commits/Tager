@@ -6,6 +6,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import android.content.ClipData;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -130,6 +132,35 @@ public class TagerRuntimeInstrumentationTest {
         assertNull(TagerLinkRouter.canonicalizeTagerUri(Uri.parse(scheme + "://products:99")));
         assertNull(TagerLinkRouter.canonicalizeTagerUri(Uri.parse(scheme + "://products\\evil")));
         assertNull(TagerLinkRouter.canonicalizeTagerUri(Uri.parse("wrong-scheme://products")));
+    }
+
+    @Test
+    public void intentSanitizerStripsUnsafeMetadata() {
+        Intent parsed = new Intent(Intent.ACTION_VIEW, Uri.parse("geo:24.7136,46.6753?q=Riyadh"));
+        parsed.setPackage("com.google.android.apps.maps");
+        parsed.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        parsed.putExtra("arbitrary_secret", "must-not-survive");
+        parsed.putExtra("browser_fallback_url", "https://example.com/fallback");
+        parsed.setClipData(ClipData.newPlainText("private", "payload"));
+
+        Intent clean = TagerIntentLinkSanitizer.sanitize(parsed);
+        assertNotNull(clean);
+        assertEquals(Intent.ACTION_VIEW, clean.getAction());
+        assertEquals("geo:24.7136,46.6753?q=Riyadh", clean.getDataString());
+        assertEquals("com.google.android.apps.maps", clean.getPackage());
+        assertTrue(clean.hasCategory(Intent.CATEGORY_BROWSABLE));
+        assertEquals(0, clean.getFlags());
+        assertNull(clean.getExtras());
+        assertNull(clean.getClipData());
+        assertNull(clean.getComponent());
+        assertNull(clean.getSelector());
+
+        Intent explicit = new Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/path"));
+        explicit.setComponent(new ComponentName("com.example.attacker", "com.example.attacker.HiddenActivity"));
+        Intent explicitClean = TagerIntentLinkSanitizer.sanitize(explicit);
+        assertNotNull(explicitClean);
+        assertNull(explicitClean.getComponent());
+        assertNull(explicitClean.getSelector());
     }
 
     @Test
