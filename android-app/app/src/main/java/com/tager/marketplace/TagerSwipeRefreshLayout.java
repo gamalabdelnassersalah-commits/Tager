@@ -22,12 +22,13 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
  *
  * The refresh gesture is intercepted by this parent before the WebView receives
  * a completed long pull, preventing duplicate refreshes from legacy touch
- * fallbacks. Refresh is debounced, requires validated connectivity and keeps the
- * native indicator visible long enough to communicate that a real reload began.
+ * fallbacks. Refresh is debounced, requires validated connectivity and keeps a
+ * lightweight timeout/progress fallback in case WebView completion callbacks are
+ * delayed or lost.
  */
 public class TagerSwipeRefreshLayout extends SwipeRefreshLayout {
     private static final long REFRESH_TIMEOUT_MS = 15000L;
-    private static final long PROGRESS_POLL_MS = 120L;
+    private static final long PROGRESS_POLL_MS = 250L;
     private static final long MIN_INDICATOR_MS = 650L;
     private static final long MIN_REFRESH_INTERVAL_MS = 1200L;
 
