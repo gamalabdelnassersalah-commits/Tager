@@ -50,22 +50,32 @@ public class TagerIntentLinkSanitizerInstrumentationTest {
     }
 
     @Test
-    public void rejectsDangerousOrUnscopedCustomSchemes() {
+    public void rejectsDangerousAndUnknownCustomSchemes() {
         assertNull(TagerIntentLinkSanitizer.sanitize(
                 new Intent(Intent.ACTION_VIEW, Uri.parse("javascript:alert(1)"))));
         assertNull(TagerIntentLinkSanitizer.sanitize(
                 new Intent(Intent.ACTION_VIEW, Uri.parse("file:///sdcard/a"))));
         assertNull(TagerIntentLinkSanitizer.sanitize(
                 new Intent(Intent.ACTION_VIEW, Uri.parse("customapp://open"))));
+
+        Intent packageScoped = new Intent(Intent.ACTION_VIEW, Uri.parse("mapsapp://place/123"));
+        packageScoped.setPackage("com.example.mapsapp");
+        assertNull(TagerIntentLinkSanitizer.sanitize(packageScoped));
     }
 
     @Test
-    public void allowsSafePackageScopedCustomScheme() {
-        Intent parsed = new Intent(Intent.ACTION_VIEW, Uri.parse("mapsapp://place/123"));
-        parsed.setPackage("com.example.mapsapp");
-        Intent clean = TagerIntentLinkSanitizer.sanitize(parsed);
-        assertEquals("mapsapp://place/123", clean.getData().toString());
-        assertEquals("com.example.mapsapp", clean.getPackage());
+    public void allowsReviewedExternalSchemesWithSafePackages() {
+        Intent geo = new Intent(Intent.ACTION_VIEW, Uri.parse("geo:24.7136,46.6753?q=Riyadh"));
+        geo.setPackage("com.google.android.apps.maps");
+        Intent cleanGeo = TagerIntentLinkSanitizer.sanitize(geo);
+        assertEquals("geo:24.7136,46.6753?q=Riyadh", cleanGeo.getData().toString());
+        assertEquals("com.google.android.apps.maps", cleanGeo.getPackage());
+
+        Intent market = new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.tager.marketplace"));
+        market.setPackage("com.android.vending");
+        Intent cleanMarket = TagerIntentLinkSanitizer.sanitize(market);
+        assertEquals("market://details?id=com.tager.marketplace", cleanMarket.getData().toString());
+        assertEquals("com.android.vending", cleanMarket.getPackage());
     }
 
     @Test
