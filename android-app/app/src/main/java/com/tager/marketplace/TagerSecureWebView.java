@@ -9,6 +9,7 @@ import android.graphics.Bitmap;
 import android.net.Uri;
 import android.net.http.SslError;
 import android.os.Build;
+import android.os.SystemClock;
 import android.util.AttributeSet;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.SafeBrowsingResponse;
@@ -35,6 +36,7 @@ import java.util.Locale;
  * activity.
  */
 public final class TagerSecureWebView extends WebView {
+    private final TagerExternalLaunchGate externalLaunchGate = new TagerExternalLaunchGate();
     private WebViewClient delegatedClient;
 
     public TagerSecureWebView(@NonNull Context context) {
@@ -182,6 +184,7 @@ public final class TagerSecureWebView extends WebView {
             showBlockedLinkMessage();
             return;
         }
+        if (!externalLaunchGate.shouldAllow("intent:" + raw, SystemClock.elapsedRealtime())) return;
 
         try {
             Intent parsed = Intent.parseUri(raw, Intent.URI_INTENT_SCHEME);
@@ -223,6 +226,9 @@ public final class TagerSecureWebView extends WebView {
     }
 
     private void openSafeExternalUri(Uri uri) {
+        if (uri == null) return;
+        String raw = uri.toString();
+        if (!externalLaunchGate.shouldAllow("external:" + raw, SystemClock.elapsedRealtime())) return;
         try {
             Intent external = new Intent(Intent.ACTION_VIEW, uri);
             external.addCategory(Intent.CATEGORY_BROWSABLE);
