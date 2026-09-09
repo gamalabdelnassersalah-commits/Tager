@@ -87,7 +87,7 @@ public class TagerRuntimeInstrumentationTest {
         assertEquals(TagerDownloadsActivity.class.getName(), downloads.getComponent().getClassName());
         assertNotNull(products.getComponent());
         assertEquals(TagerActivity.class.getName(), products.getComponent().getClassName());
-        assertEquals(scheme + "://open/products", products.getDataString());
+        assertEquals("tager://open/products", products.getDataString());
     }
 
     @Test
