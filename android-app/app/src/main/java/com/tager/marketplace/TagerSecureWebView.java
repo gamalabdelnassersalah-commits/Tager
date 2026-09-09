@@ -1,5 +1,6 @@
 package com.tager.marketplace;
 
+import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
@@ -56,6 +57,7 @@ public final class TagerSecureWebView extends WebView {
 
     private final class GuardedClient extends WebViewClient {
         @Override
+        @TargetApi(Build.VERSION_CODES.N)
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
             if (request == null || request.getUrl() == null) return true;
             Boolean handled = handleGuardedNavigation(request.getUrl());
