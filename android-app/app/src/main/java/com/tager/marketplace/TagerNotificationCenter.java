@@ -44,7 +44,7 @@ final class TagerNotificationCenter {
                 notificationId,
                 title,
                 message,
-                Uri.parse("tager://" + TagerLinkRouter.sanitizePage(page)),
+                TagerLinkRouter.pageUri(page),
                 NotificationCompat.PRIORITY_HIGH);
     }
 
@@ -55,7 +55,7 @@ final class TagerNotificationCenter {
                 notificationId,
                 title,
                 message,
-                Uri.parse("tager://" + TagerLinkRouter.sanitizePage(page)),
+                TagerLinkRouter.pageUri(page),
                 NotificationCompat.PRIORITY_DEFAULT);
     }
 
@@ -105,7 +105,7 @@ final class TagerNotificationCenter {
 
         String safeTitle = title == null || title.trim().isEmpty() ? "Tager | تاجر" : title.trim();
         String safeMessage = message == null ? "" : message.trim();
-        Uri safeTarget = target == null ? Uri.parse("tager://home") : target;
+        Uri safeTarget = target == null ? TagerLinkRouter.pageUri("home") : target;
 
         Intent open = TagerLinkRouter.buildOpenIntent(context, safeTarget);
         PendingIntent pendingIntent = PendingIntent.getActivity(
