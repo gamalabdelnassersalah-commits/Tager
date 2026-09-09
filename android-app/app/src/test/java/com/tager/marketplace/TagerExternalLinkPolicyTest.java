@@ -16,9 +16,39 @@ public class TagerExternalLinkPolicyTest {
         assertTrue(TagerExternalLinkPolicy.isAllowedExternalScheme("whatsapp"));
         assertTrue(TagerExternalLinkPolicy.isAllowedExternalScheme("market"));
         assertTrue(TagerExternalLinkPolicy.isAllowedExternalScheme("geo"));
+        assertTrue(TagerExternalLinkPolicy.isAllowedExternalScheme("google.navigation"));
         assertFalse(TagerExternalLinkPolicy.isAllowedExternalScheme("file"));
         assertFalse(TagerExternalLinkPolicy.isAllowedExternalScheme("javascript"));
         assertFalse(TagerExternalLinkPolicy.isAllowedExternalScheme("content"));
+    }
+
+    @Test
+    public void validatesSafeExternalUris() {
+        assertTrue(TagerExternalLinkPolicy.isSafeExternalUri("https://example.com/path?q=1"));
+        assertTrue(TagerExternalLinkPolicy.isSafeExternalUri("tel:+966500000000"));
+        assertTrue(TagerExternalLinkPolicy.isSafeExternalUri("mailto:support@example.com"));
+        assertTrue(TagerExternalLinkPolicy.isSafeExternalUri("geo:24.7136,46.6753?q=Riyadh"));
+        assertTrue(TagerExternalLinkPolicy.isSafeExternalUri("google.navigation:q=24.7136,46.6753"));
+        assertFalse(TagerExternalLinkPolicy.isSafeExternalUri("javascript:alert(1)"));
+        assertFalse(TagerExternalLinkPolicy.isSafeExternalUri("file:///sdcard/a"));
+        assertFalse(TagerExternalLinkPolicy.isSafeExternalUri("content://com.example/private"));
+        assertFalse(TagerExternalLinkPolicy.isSafeExternalUri("https://example.com/%0aevil"));
+        assertFalse(TagerExternalLinkPolicy.isSafeExternalUri("https://example.com\\@evil.example"));
+    }
+
+    @Test
+    public void validatesIntentUriEnvelopeBeforeAndroidParsing() {
+        assertTrue(TagerExternalLinkPolicy.isSafeIntentUri(
+                "intent://scan/#Intent;scheme=zxing;package=com.google.zxing.client.android;end"));
+        assertTrue(TagerExternalLinkPolicy.isSafeIntentUri(
+                "intent://maps/#Intent;scheme=geo;package=com.google.android.apps.maps;end"));
+        assertFalse(TagerExternalLinkPolicy.isSafeIntentUri("intent://scan/"));
+        assertFalse(TagerExternalLinkPolicy.isSafeIntentUri(
+                "intent://scan/#Intent;scheme=zxing;package=com.google.zxing.client.android;end\nfile:///sdcard/a"));
+        assertFalse(TagerExternalLinkPolicy.isSafeIntentUri(
+                "intent://scan\\evil/#Intent;scheme=zxing;end"));
+        assertFalse(TagerExternalLinkPolicy.isSafeIntentUri(
+                "intent://scan/#Intent;scheme=zxing;S.browser_fallback_url=https://example.com/%0aevil;end"));
     }
 
     @Test
