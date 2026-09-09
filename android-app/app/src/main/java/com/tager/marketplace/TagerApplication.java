@@ -7,6 +7,8 @@ import android.app.NotificationManager;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -22,15 +24,17 @@ public class TagerApplication extends Application {
     public static final String CHANNEL_DOWNLOADS = "tager_downloads";
     private static final String PERIODIC_MAINTENANCE = "tager_periodic_maintenance";
     private static final String GOOGLE_PLAY_PACKAGE = "com.android.vending";
+    private static final long MAINTENANCE_STARTUP_DELAY_MS = 5000L;
 
     private TagerUpdateCoordinator updateCoordinator;
+    private final Handler startupHandler = new Handler(Looper.getMainLooper());
 
     @Override
     public void onCreate() {
         super.onCreate();
         installCrashRecorder();
         createNotificationChannels();
-        scheduleMaintenance();
+        scheduleMaintenanceDeferred();
         if (isInstalledFromGooglePlay()) {
             updateCoordinator = new TagerUpdateCoordinator(this);
         }
@@ -106,15 +110,23 @@ public class TagerApplication extends Application {
         manager.createNotificationChannel(downloads);
     }
 
+    private void scheduleMaintenanceDeferred() {
+        startupHandler.postDelayed(this::scheduleMaintenance, MAINTENANCE_STARTUP_DELAY_MS);
+    }
+
     private void scheduleMaintenance() {
-        PeriodicWorkRequest request = new PeriodicWorkRequest.Builder(
-                TagerMaintenanceWorker.class,
-                24,
-                TimeUnit.HOURS)
-                .build();
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-                PERIODIC_MAINTENANCE,
-                ExistingPeriodicWorkPolicy.UPDATE,
-                request);
+        try {
+            PeriodicWorkRequest request = new PeriodicWorkRequest.Builder(
+                    TagerMaintenanceWorker.class,
+                    24,
+                    TimeUnit.HOURS)
+                    .build();
+            WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                    PERIODIC_MAINTENANCE,
+                    ExistingPeriodicWorkPolicy.UPDATE,
+                    request);
+        } catch (RuntimeException ignored) {
+            // Maintenance is best-effort and must never delay or crash app startup.
+        }
     }
 }
