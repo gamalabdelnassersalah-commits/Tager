@@ -13,6 +13,7 @@ final class TagerLinkRouter {
     static final String PRODUCTION_HOST = TagerTrustedLinkPolicy.PRODUCTION_HOST;
     static final String EXTRA_TARGET_URL = "tager_target_url";
     private static final int MAX_CUSTOM_URI_LENGTH = 2048;
+    private static final String INTERNAL_RUNTIME_SCHEME = "tager";
 
     private TagerLinkRouter() { }
 
@@ -43,7 +44,7 @@ final class TagerLinkRouter {
                 } else if ("share".equalsIgnoreCase(host)) {
                     intent = new Intent(
                             Intent.ACTION_VIEW,
-                            Uri.parse(BuildConfig.CUSTOM_SCHEME + "://share"),
+                            Uri.parse(INTERNAL_RUNTIME_SCHEME + "://share"),
                             context,
                             TagerActivity.class);
                 } else {
@@ -96,7 +97,7 @@ final class TagerLinkRouter {
     }
 
     private static Uri internalPageUri(String page) {
-        return Uri.parse(BuildConfig.CUSTOM_SCHEME + "://open/" + sanitizePage(page));
+        return Uri.parse(INTERNAL_RUNTIME_SCHEME + "://open/" + sanitizePage(page));
     }
 
     static String sanitizePage(String page) {
