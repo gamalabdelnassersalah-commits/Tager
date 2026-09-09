@@ -31,9 +31,8 @@ import java.util.Locale;
  * WebView guard that sanitizes links before they can leave the Tager runtime.
  *
  * TagerActivity still owns all normal page callbacks and internal navigation.
- * This wrapper only intercepts external/deep-link schemes that need additional
- * validation, then delegates all other callbacks to the client supplied by the
- * activity.
+ * This wrapper intercepts every external/deep-link scheme so outbound navigation
+ * has one security and duplicate-launch policy.
  */
 public final class TagerSecureWebView extends WebView {
     private final TagerExternalLaunchGate externalLaunchGate = new TagerExternalLaunchGate();
@@ -164,7 +163,8 @@ public final class TagerSecureWebView extends WebView {
         }
 
         if ("http".equals(scheme) || "https".equals(scheme)) {
-            return null;
+            openExternalWebLink(uri);
+            return true;
         }
 
         if (TagerExternalLinkPolicy.isSafeExternalUri(raw)) {
@@ -229,6 +229,31 @@ public final class TagerSecureWebView extends WebView {
         if (uri == null) return;
         String raw = uri.toString();
         if (!externalLaunchGate.shouldAllow("external:" + raw, SystemClock.elapsedRealtime())) return;
+        launchExternalIntent(uri);
+    }
+
+    private void openExternalWebLink(Uri uri) {
+        if (uri == null) return;
+        String raw = uri.toString();
+        if (!TagerExternalLinkPolicy.isSafeExternalUri(raw)) {
+            showBlockedLinkMessage();
+            return;
+        }
+        if (!externalLaunchGate.shouldAllow("web:" + raw, SystemClock.elapsedRealtime())) return;
+        try {
+            CustomTabsIntent customTabs = new CustomTabsIntent.Builder()
+                    .setShowTitle(true)
+                    .setUrlBarHidingEnabled(true)
+                    .setToolbarColor(getResources().getColor(R.color.tager_teal, getContext().getTheme()))
+                    .setNavigationBarColor(getResources().getColor(R.color.white, getContext().getTheme()))
+                    .build();
+            customTabs.launchUrl(getContext(), uri);
+        } catch (RuntimeException error) {
+            launchExternalIntent(uri);
+        }
+    }
+
+    private void launchExternalIntent(Uri uri) {
         try {
             Intent external = new Intent(Intent.ACTION_VIEW, uri);
             external.addCategory(Intent.CATEGORY_BROWSABLE);
@@ -240,20 +265,6 @@ public final class TagerSecureWebView extends WebView {
             getContext().startActivity(external);
         } catch (ActivityNotFoundException | SecurityException error) {
             Toast.makeText(getContext(), "لا يوجد تطبيق لفتح الرابط", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void openExternalWebLink(Uri uri) {
-        try {
-            CustomTabsIntent customTabs = new CustomTabsIntent.Builder()
-                    .setShowTitle(true)
-                    .setUrlBarHidingEnabled(true)
-                    .setToolbarColor(getResources().getColor(R.color.tager_teal, getContext().getTheme()))
-                    .setNavigationBarColor(getResources().getColor(R.color.white, getContext().getTheme()))
-                    .build();
-            customTabs.launchUrl(getContext(), uri);
-        } catch (RuntimeException error) {
-            openSafeExternalUri(uri);
         }
     }
 
