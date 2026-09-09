@@ -32,11 +32,11 @@ final class TagerIntentLinkSanitizer {
         String scheme = data.getScheme();
         if (scheme == null || TagerExternalLinkPolicy.isBlockedWebViewScheme(scheme)) return null;
 
-        boolean supportedScheme = TagerExternalLinkPolicy.isAllowedExternalScheme(scheme);
-        // A package-scoped custom app scheme is permitted only when the package
-        // name itself is syntactically safe. This preserves legitimate app links
-        // without allowing a generic custom scheme to escape the WebView.
-        if (!supportedScheme && packageName == null) return null;
+        // A syntactically valid package name alone is not enough to authorize an
+        // arbitrary custom scheme. Only the small, reviewed external-scheme
+        // allowlist may leave the WebView. Unsupported app schemes must fall back
+        // to a separately validated http/https browser URL when one was supplied.
+        if (!TagerExternalLinkPolicy.isAllowedExternalScheme(scheme)) return null;
 
         Intent clean = new Intent(Intent.ACTION_VIEW, data);
         clean.addCategory(Intent.CATEGORY_BROWSABLE);
