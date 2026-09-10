@@ -12,6 +12,7 @@ import android.os.Looper;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.work.Constraints;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
@@ -134,10 +135,15 @@ public class TagerApplication extends Application {
 
     private void scheduleMaintenance() {
         try {
+            Constraints constraints = new Constraints.Builder()
+                    .setRequiresBatteryNotLow(true)
+                    .setRequiresStorageNotLow(true)
+                    .build();
             PeriodicWorkRequest request = new PeriodicWorkRequest.Builder(
                     TagerMaintenanceWorker.class,
                     24,
                     TimeUnit.HOURS)
+                    .setConstraints(constraints)
                     .build();
             WorkManager.getInstance(this).enqueueUniquePeriodicWork(
                     PERIODIC_MAINTENANCE,
