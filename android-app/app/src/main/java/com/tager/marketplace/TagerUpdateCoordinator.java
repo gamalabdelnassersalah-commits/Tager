@@ -136,19 +136,38 @@ final class TagerUpdateCoordinator {
                 .addOnSuccessListener(info -> {
                     updateCheckInProgress = false;
                     if (!isUsable(activity)) return;
+
                     if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS
                             && info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)) {
                         startFlexibleUpdate(activity, info);
-                    } else if (info.installStatus() == InstallStatus.DOWNLOADED) {
+                        return;
+                    }
+
+                    if (info.installStatus() == InstallStatus.DOWNLOADED) {
                         updateFlowStarted = false;
+                        preferences.edit()
+                                .remove(KEY_UPDATE_LATER_AT)
+                                .putLong(KEY_LAST_CHECK_AT, System.currentTimeMillis())
+                                .apply();
                         showInstallReadyPrompt(activity, false);
-                    } else {
-                        updateFlowStarted = false;
+                        return;
+                    }
+
+                    boolean stillAvailable = info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
+                            && info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE);
+                    updateFlowStarted = false;
+                    lastRuntimeCheckAt = System.currentTimeMillis();
+                    if (stillAvailable) {
+                        preferences.edit()
+                                .putLong(KEY_UPDATE_LATER_AT, lastRuntimeCheckAt)
+                                .putLong(KEY_LAST_CHECK_AT, lastRuntimeCheckAt)
+                                .apply();
                     }
                 })
                 .addOnFailureListener(error -> {
                     updateCheckInProgress = false;
                     updateFlowStarted = false;
+                    lastRuntimeCheckAt = System.currentTimeMillis();
                 });
     }
 
@@ -218,6 +237,7 @@ final class TagerUpdateCoordinator {
                     UPDATE_REQUEST_CODE);
         } catch (IntentSender.SendIntentException | RuntimeException error) {
             updateFlowStarted = false;
+            lastRuntimeCheckAt = System.currentTimeMillis();
         }
     }
 
