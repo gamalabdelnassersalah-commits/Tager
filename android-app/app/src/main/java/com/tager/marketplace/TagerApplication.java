@@ -53,6 +53,10 @@ public class TagerApplication extends Application {
         });
     }
 
+    boolean onUpdateActivityResult(int requestCode, int resultCode) {
+        return updateCoordinator != null && updateCoordinator.onActivityResult(requestCode, resultCode);
+    }
+
     private void ensureUpdateCoordinator() {
         if (updateCoordinator != null) return;
         if (installedFromGooglePlay == null) {
