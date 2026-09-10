@@ -137,31 +137,36 @@ final class TagerUpdateCoordinator {
                     updateCheckInProgress = false;
                     if (!isUsable(activity)) return;
 
-                    if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS
-                            && info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)) {
-                        startFlexibleUpdate(activity, info);
-                        return;
-                    }
+                    boolean flexibleAllowed = info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE);
+                    TagerUpdateResumePolicy.Action action = TagerUpdateResumePolicy.decide(
+                            info.updateAvailability(),
+                            info.installStatus(),
+                            flexibleAllowed);
 
-                    if (info.installStatus() == InstallStatus.DOWNLOADED) {
-                        updateFlowStarted = false;
-                        preferences.edit()
-                                .remove(KEY_UPDATE_LATER_AT)
-                                .putLong(KEY_LAST_CHECK_AT, System.currentTimeMillis())
-                                .apply();
-                        showInstallReadyPrompt(activity, false);
-                        return;
-                    }
-
-                    boolean stillAvailable = info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                            && info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE);
-                    updateFlowStarted = false;
-                    lastRuntimeCheckAt = System.currentTimeMillis();
-                    if (stillAvailable) {
-                        preferences.edit()
-                                .putLong(KEY_UPDATE_LATER_AT, lastRuntimeCheckAt)
-                                .putLong(KEY_LAST_CHECK_AT, lastRuntimeCheckAt)
-                                .apply();
+                    switch (action) {
+                        case RESUME_ACTIVE_FLOW:
+                            startFlexibleUpdate(activity, info);
+                            return;
+                        case PROMPT_INSTALL:
+                            updateFlowStarted = false;
+                            preferences.edit()
+                                    .remove(KEY_UPDATE_LATER_AT)
+                                    .putLong(KEY_LAST_CHECK_AT, System.currentTimeMillis())
+                                    .apply();
+                            showInstallReadyPrompt(activity, false);
+                            return;
+                        case COOLDOWN_AVAILABLE_UPDATE:
+                            updateFlowStarted = false;
+                            lastRuntimeCheckAt = System.currentTimeMillis();
+                            preferences.edit()
+                                    .putLong(KEY_UPDATE_LATER_AT, lastRuntimeCheckAt)
+                                    .putLong(KEY_LAST_CHECK_AT, lastRuntimeCheckAt)
+                                    .apply();
+                            return;
+                        case CLEAR_FLOW:
+                        default:
+                            updateFlowStarted = false;
+                            lastRuntimeCheckAt = System.currentTimeMillis();
                     }
                 })
                 .addOnFailureListener(error -> {
