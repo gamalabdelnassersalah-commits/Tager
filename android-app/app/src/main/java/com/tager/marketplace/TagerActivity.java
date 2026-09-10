@@ -1047,6 +1047,10 @@ public class TagerActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (getApplication() instanceof TagerApplication
+                && ((TagerApplication) getApplication()).onUpdateActivityResult(requestCode, resultCode)) {
+            return;
+        }
         if (requestCode != FILE_CHOOSER_REQUEST || fileCallback == null) return;
 
         ValueCallback<Uri[]> callback = fileCallback;
