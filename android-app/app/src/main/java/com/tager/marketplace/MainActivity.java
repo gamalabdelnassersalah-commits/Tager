@@ -486,6 +486,13 @@ public class MainActivity extends Activity {
                 "document.body.classList.add('tager-native-android');" +
                 "document.documentElement.style.webkitTextSizeAdjust='100%';" +
                 "if(!window.__tagerNativeLinks){window.__tagerNativeLinks=true;document.addEventListener('click',function(e){var t=e.target;var a=t&&t.closest?t.closest('a[target=\\\"_blank\\\"]'):null;if(a){a.target='_self';}},true);}" +
+                // R38: Optimize Supabase Storage images for mobile - reduce data usage and speed up loading
+                "if(!window.__tagerImageOpt){window.__tagerImageOpt=true;" +
+                "var isSupabaseStorage=function(u){try{var url=new URL(u,location.origin);return/supabase.co$/.test(url.hostname)&&/storage\/v1\/object\/public\//.test(url.pathname)}catch(_){return false}};" +
+                "var addThumbParams=function(u,size){try{var url=new URL(u,location.origin);if(!isSupabaseStorage(url.href))return u;url.searchParams.set('width',String(size));url.searchParams.set('height',String(size));url.searchParams.set('resize','cover');url.searchParams.set('quality','75');return url.href}catch(_){return u}};" +
+                "var observer=new MutationObserver(function(mutations){mutations.forEach(function(m){m.addedNodes.forEach(function(node){if(node.nodeType===1){if(node.tagName==='IMG'){var src=node.getAttribute('src')||'';if(src&&!node.dataset.tagerOpt&&isSupabaseStorage(src)){var w=node.clientWidth||node.offsetWidth||200;var size=Math.min(Math.max(w*2,200),600);node.src=addThumbParams(src,size);node.dataset.tagerOpt='1';node.decoding='async';}}else if(node.querySelectorAll){node.querySelectorAll('img').forEach(function(img){var src=img.getAttribute('src')||'';if(src&&!img.dataset.tagerOpt&&isSupabaseStorage(src)){var w=img.clientWidth||img.offsetWidth||200;var size=Math.min(Math.max(w*2,200),600);img.src=addThumbParams(src,size);img.dataset.tagerOpt='1';img.decoding='async';}})}}})}});" +
+                "observer.observe(document.body,{childList:true,subtree:true});" +
+                "document.querySelectorAll('img').forEach(function(img){var src=img.getAttribute('src')||'';if(src&&!img.dataset.tagerOpt&&isSupabaseStorage(src)){var w=img.clientWidth||img.offsetWidth||200;var size=Math.min(Math.max(w*2,200),600);img.src=addThumbParams(src,size);img.dataset.tagerOpt='1';img.decoding='async';}});}" +
                 "})();";
         view.evaluateJavascript(script, null);
     }
